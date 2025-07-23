@@ -155,9 +155,7 @@ if menu == "Preprocessing & Analisis Musim":
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
 # === Menu 2: Normalisasi & Train-Test Split ===
-
-st.title("🔄 Preprocessing & Splitting Data")
-   # --- 1. Normalisasi ---
+if selected_menu == "Normalisasi dan Splitting Data":
     st.subheader("📉 Normalisasi Fitur 'FF_X'")
     values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
     scaler = MinMaxScaler(feature_range=(0, 1))
