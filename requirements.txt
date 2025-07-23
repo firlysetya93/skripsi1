@@ -6,4 +6,3 @@ scikit-learn
 statsmodels
 openpyxl
 optuna
-tensorflow
