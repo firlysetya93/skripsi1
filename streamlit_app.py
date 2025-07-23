@@ -9,6 +9,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import time
 
 st.title("🔍 Pemeriksaan Missing Values dalam Dataset")
@@ -362,12 +363,26 @@ with st.expander("7. Transformasi Supervised dan Pembagian Data"):
         st.write("Contoh data output (y_train[0]):")
         st.write(y_train[0])
 
-st.header("🔧 Tuning Hyperparameter LSTM dengan Optuna")
+# --- Judul Aplikasi ---
+st.title("LSTM Hyperparameter Tuning with Optuna")
 
-if 'X_train' in locals():
-    st.success("Data berhasil disiapkan! Siap melakukan tuning hyperparameter.")
+# --- Menampilkan dataset yang digunakan (jika tersedia) ---
+if 'df' in st.session_state:
+    st.subheader("Data Sample")
+    st.write(st.session_state.df.head())
 
-    # Define the objective function for Optuna
+# --- Informasi tentang data yang digunakan untuk training ---
+if 'X_train' in st.session_state and 'y_train' in st.session_state:
+    X_train = st.session_state.X_train
+    X_test = st.session_state.X_test
+    y_train = st.session_state.y_train
+    y_test = st.session_state.y_test
+    n_features = X_train.shape[2]
+
+    st.write("Ukuran data training:", X_train.shape)
+    st.write("Ukuran data testing:", X_test.shape)
+
+    # Fungsi untuk objective Optuna
     def objective(trial):
         lstm_units = trial.suggest_int('lstm_units', 10, 200)
         dense_units = trial.suggest_int('dense_units', 10, 200)
@@ -377,16 +392,13 @@ if 'X_train' in locals():
         epochs = trial.suggest_int('epochs', 20, 100)
         batch_size = trial.suggest_int('batch_size', 16, 128)
 
-        # Build model
         model = Sequential()
         model.add(LSTM(lstm_units, activation='relu', dropout=dropout_rate,
-                       recurrent_dropout=recurrent_dropout_rate,
-                       return_sequences=True,
+                       recurrent_dropout=recurrent_dropout_rate, return_sequences=True,
                        input_shape=(X_train.shape[1], X_train.shape[2])))
         model.add(Dropout(dropout_rate))
         model.add(LSTM(lstm_units, activation='relu',
-                       dropout=dropout_rate,
-                       recurrent_dropout=recurrent_dropout_rate))
+                       dropout=dropout_rate, recurrent_dropout=recurrent_dropout_rate))
         model.add(Dropout(dropout_rate))
         model.add(Dense(dense_units, activation='relu'))
         model.add(Dense(n_features))
@@ -394,7 +406,6 @@ if 'X_train' in locals():
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mean_squared_error')
 
-        # Early stopping
         early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
         model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
@@ -404,19 +415,232 @@ if 'X_train' in locals():
         loss = model.evaluate(X_test, y_test, verbose=0)
         return loss
 
-    if st.button("🔍 Jalankan Tuning Optuna"):
-        start_time = time.time()
-        study = optuna.create_study(direction='minimize')
-        with st.spinner("Menjalankan tuning... Mohon tunggu beberapa menit."):
+    # Mulai tuning ketika tombol ditekan
+    if st.button("Mulai Hyperparameter Tuning dengan Optuna"):
+        with st.spinner("Tuning sedang berlangsung..."):
+            study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=50)
-        end_time = time.time()
+            best_params = study.best_params
+            st.success("Tuning selesai!")
+            st.write("Best Parameters:")
+            st.json(best_params)
 
-        st.success("Tuning selesai!")
-        st.write("⏱️ Waktu yang dibutuhkan:", round(end_time - start_time, 2), "detik")
-        st.subheader("🔑 Hasil Tuning Hyperparameter Terbaik")
-        st.json(study.best_params)
+            # Simpan ke session state untuk digunakan kembali
+            st.session_state.best_params = best_params
+            st.session_state.study = study
 
-        # Simpan best_params ke session state
-        st.session_state['best_params'] = study.best_params
+    # Latih ulang model dengan parameter terbaik
+    if 'best_params' in st.session_state:
+        best_params = st.session_state.best_params
+
+        st.subheader("Training Model Akhir dengan Parameter Terbaik")
+
+        tuned_model = Sequential()
+        tuned_model.add(LSTM(best_params['lstm_units'], activation='relu',
+                             dropout=best_params['dropout_rate'],
+                             recurrent_dropout=best_params['recurrent_dropout_rate'],
+                             return_sequences=True,
+                             input_shape=(X_train.shape[1], X_train.shape[2])))
+        tuned_model.add(Dropout(best_params['dropout_rate']))
+        tuned_model.add(LSTM(best_params['lstm_units'], activation='relu',
+                             dropout=best_params['dropout_rate'],
+                             recurrent_dropout=best_params['recurrent_dropout_rate']))
+        tuned_model.add(Dropout(best_params['dropout_rate']))
+        tuned_model.add(Dense(best_params['dense_units'], activation='relu'))
+        tuned_model.add(Dense(n_features))
+
+        optimizer = Adam(learning_rate=best_params['learning_rate'])
+        tuned_model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['mae'])
+
+        early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+        history = tuned_model.fit(X_train, y_train, epochs=best_params['epochs'],
+                                  batch_size=best_params['batch_size'],
+                                  validation_data=(X_test, y_test),
+                                  callbacks=[early_stopping], shuffle=False, verbose=0)
+
+        test_loss, test_mae = tuned_model.evaluate(X_test, y_test)
+        st.write(f"Test Loss: {test_loss:.4f}")
+        st.write(f"Test MAE: {test_mae:.4f}")
+
+        # Plot training vs validation loss
+        st.subheader("Grafik Loss Selama Training")
+        fig, ax = plt.subplots()
+        ax.plot(history.history['loss'], label='Training Loss')
+        ax.plot(history.history['val_loss'], label='Validation Loss')
+        ax.set_xlabel('Epochs')
+        ax.set_ylabel('Loss')
+        ax.legend()
+        st.pyplot(fig)
+
 else:
-    st.warning("❗ Silakan pastikan data sudah di-preprocess dan diubah menjadi supervised sebelum menjalankan tuning.")
+    st.warning("Silakan lakukan preprocessing dan pembentukan data train-test sebelum tuning model.")
+# Fungsi plotting
+def inverse_transform_and_plot(y_true, y_pred, scaler, features):
+    inv_pred = scaler.inverse_transform(y_pred)
+    inv_true = scaler.inverse_transform(y_true)
+
+    for i in range(len(features)):
+        fig, ax = plt.subplots(figsize=(15, 6))
+        ax.plot(inv_true[:, i], label='Actual')
+        ax.plot(inv_pred[:, i], label='Predicted')
+        ax.set_title(f'Actual vs Predicted for {features[i]}')
+        ax.set_xlabel('Time')
+        ax.set_ylabel(features[i])
+        ax.legend()
+        st.pyplot(fig)
+    
+    return inv_true, inv_pred
+
+# Fungsi buat dataframe prediksi
+def create_predictions_dataframe(y_true, y_pred, feature_name='FF_X'):
+    y_true_flat = y_true.flatten()
+    y_pred_flat = np.round(y_pred.flatten(), 3)
+    df_final = pd.DataFrame({
+        f'{feature_name}': y_true_flat,
+        f'{feature_name}_pred': y_pred_flat
+    })
+    return df_final
+
+# Fungsi evaluasi
+def calculate_metrics(y_true, y_pred, features):
+    metrics = {
+        'feature': [],
+        'MAE': [],
+        'R2': [],
+        'RMSE': [],
+        'MAPE': []
+    }
+
+    for i, feature in enumerate(features):
+        actual = y_true[:, i].flatten()
+        predicted = y_pred[:, i].flatten()
+
+        mae = mean_absolute_error(actual, predicted)
+        r2 = r2_score(actual, predicted)
+        rmse = np.sqrt(mean_squared_error(actual, predicted))
+        mape = np.mean(np.abs((actual - predicted) / actual)) * 100
+
+        metrics['feature'].append(feature)
+        metrics['MAE'].append(mae)
+        metrics['R2'].append(r2)
+        metrics['RMSE'].append(rmse)
+        metrics['MAPE'].append(mape)
+
+    return pd.DataFrame(metrics)
+
+# STREAMLIT APP ========================
+st.title("📈 Evaluasi Hasil Prediksi Model")
+
+# Simulasi load data (ganti dengan hasil dari modelmu)
+if 'y_true' not in st.session_state or 'y_pred' not in st.session_state:
+    st.warning("Silakan jalankan model terlebih dahulu.")
+else:
+    y_true = st.session_state.y_true
+    y_pred = st.session_state.y_pred
+    scaler = st.session_state.scaler
+    features = st.session_state.features
+
+    # Inverse transform dan plot
+    st.subheader("Visualisasi Prediksi vs Aktual")
+    inv_true, inv_pred = inverse_transform_and_plot(y_true, y_pred, scaler, features)
+
+    # Tabel hasil prediksi
+    st.subheader("📊 Tabel Prediksi vs Aktual")
+    for i, feature in enumerate(features):
+        df_pred = create_predictions_dataframe(inv_true[:, i:i+1], inv_pred[:, i:i+1], feature_name=feature)
+        st.write(f"**{feature}**")
+        st.dataframe(df_pred.head(50))
+
+    # Evaluasi
+    st.subheader("📉 Evaluasi Akurasi Model")
+    df_metrics = calculate_metrics(inv_true, inv_pred, features)
+    st.dataframe(df_metrics.style.format({"MAE": "{:.3f}", "R2": "{:.3f}", "RMSE": "{:.3f}", "MAPE": "{:.2f}%"}))
+st.title("Prediksi Kecepatan Angin dengan LSTM")
+
+uploaded_file = st.file_uploader("Upload file data cuaca (.xlsx/.csv)", type=['xlsx', 'csv'])
+feature = st.text_input("Masukkan nama kolom target (contoh: FF_X)", value="FF_X")
+lag_value = st.slider("Pilih jumlah lag (back step)", 1, 30, 3)
+submit = st.button("Mulai Prediksi")
+
+if uploaded_file and submit:
+    if uploaded_file.name.endswith(".xlsx"):
+        df = pd.read_excel(uploaded_file)
+    else:
+        df = pd.read_csv(uploaded_file)
+
+    st.write("Contoh data:")
+    st.dataframe(df.head())
+
+    # Cek nilai hilang
+    if df[feature].isnull().sum() > 0:
+        df[feature].fillna(method='ffill', inplace=True)
+        st.warning("Missing value diisi dengan forward fill.")
+
+    # Normalisasi
+    scaler = MinMaxScaler()
+    scaled_feature = scaler.fit_transform(df[[feature]])
+
+    # Simpan scaler
+    os.makedirs("scaler", exist_ok=True)
+    joblib.dump(scaler, "scaler/target_scaler.pkl")
+
+    # Supervised Learning
+    supervised = to_supervised(scaled_feature, lag=lag_value)
+    supervised_values = supervised.values
+    train, test = split_data_supervised(supervised_values)
+
+    train_X, train_y = train[:, :-1], train[:, -1:]
+    test_X, test_y = test[:, :-1], test[:, -1:]
+
+    # Reshape ke 3D
+    train_X_3d = reshape_3d(train_X)
+    test_X_3d = reshape_3d(test_X)
+
+    # Train Model
+    model = train_lstm_model(train_X_3d, train_y, epochs=50)
+    os.makedirs("model", exist_ok=True)
+    model.save("model/saved_model.h5")
+
+    # Prediksi
+    y_pred = model.predict(test_X_3d)
+
+    # Plot & Inverse
+    inv_true, inv_pred = inverse_transform_and_plot(test_y, y_pred, scaler, feature)
+
+    # Metrik
+    metrics = calculate_metrics(inv_true, inv_pred)
+    st.subheader("Evaluasi Model")
+    st.json(metrics)
+
+    st.success("Prediksi selesai dan model telah disimpan.")
+# --- Judul halaman ---
+st.header('Evaluasi Model LSTM Terbaik')
+
+# --- Plot Loss Training dan Validasi ---
+st.subheader('Training vs Validation Loss')
+fig_loss, ax_loss = plt.subplots()
+ax_loss.plot(history.history['loss'], label='Training Loss')
+ax_loss.plot(history.history['val_loss'], label='Validation Loss')
+ax_loss.set_xlabel('Epochs')
+ax_loss.set_ylabel('Loss')
+ax_loss.legend()
+st.pyplot(fig_loss)
+
+# --- Plot Hasil Prediksi vs Aktual ---
+st.subheader('Perbandingan Nilai Aktual vs Prediksi')
+fig_pred, ax_pred = plt.subplots()
+ax_pred.plot(y_test_inverse, label='Aktual')
+ax_pred.plot(y_hat_inverse, label='Prediksi')
+ax_pred.set_title('Prediksi vs Aktual (Test Set)')
+ax_pred.set_ylabel('FF_X')
+ax_pred.legend()
+st.pyplot(fig_pred)
+
+# --- Tampilkan Tabel Metrik Evaluasi ---
+st.subheader('Evaluasi Model')
+st.dataframe(metrics_df.style.format({'MAE': '{:.4f}', 'RMSE': '{:.4f}', 'R2': '{:.4f}', 'MAPE': '{:.2f}%'}))
+
+# --- Tampilkan Tabel Prediksi (10 data teratas) ---
+st.subheader('Contoh Nilai Aktual & Prediksi')
+st.dataframe(predictions_df.head(10).style.format('{:.2f}'))
