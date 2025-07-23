@@ -44,14 +44,10 @@ st.title("📈 Analisis Musiman Kecepatan Angin")
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
-
-    # Konversi kolom tanggal
     df['TANGGAL'] = pd.to_datetime(df['TANGGAL'])
-
-    # Tambahkan kolom Bulan
+    
+    # Tambah kolom Bulan dan Musim hanya sekali di awal
     df['Bulan'] = df['TANGGAL'].dt.month
-
-    # Tambahkan kolom Musim
     def determine_season(month):
         if month in [12, 1, 2]:
             return 'HUJAN'
@@ -61,8 +57,10 @@ if uploaded_file is not None:
             return 'KEMARAU'
         elif month in [9, 10, 11]:
             return 'PANCAROBA II'
-
     df['Musim'] = df['Bulan'].apply(determine_season)
+
+    # Simpan df ini ke session_state supaya bisa dipakai di blok lain
+    st.session_state['df'] = df
 
     # Tampilkan preview data
     st.subheader("📋 Data Setelah Ditambah Kolom Bulan & Musim")
