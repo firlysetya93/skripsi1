@@ -91,38 +91,41 @@ if menu == "Preprocessing & Analisis Musim":
                 ax1.set_xticks(rata_tahunan.index)
                 st.pyplot(fig1)
             # --- Uji Stasioneritas ADF dan ACF/PACF Seluruh Data ---
-                if 'FF_X' in df_musim.columns and 'TANGGAL' in df_musim.columns:
-                    try:
-                        ts = df_musim['FF_X'].dropna()
-
-                        st.subheader("📊 Uji Stasioneritas ADF - Seluruh Data")
-                        result = adfuller(ts, autolag='AIC')
-                        st.write(f"**ADF Statistic**: {result[0]:.4f}")
-                        st.write(f"**p-value**: {result[1]:.4f}")
-                        st.write("**Critical Values:**")
-                        for key, value in result[4].items():
-                            st.write(f"  - {key}: {value:.4f}")
-                        if result[1] <= 0.05:
-                            st.success("✅ Data stasioner (tolak H0)")
-                        else:
-                            st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
-
-                        st.subheader("🔍 Visualisasi ACF, PACF, dan Time Series (Seluruh Data)")
-                        fig2, axes = plt.subplots(3, 1, figsize=(12, 12))
-                        plt.subplots_adjust(hspace=0.5)
-                        plot_acf(ts, lags=50, ax=axes[0])
-                        axes[0].set_title('ACF - Seluruh Data')
-                        plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
-                        axes[1].set_title('PACF - Seluruh Data')
-                        axes[2].plot(df_musim['TANGGAL'], ts, color='blue')
-                        axes[2].set_title('Seri Waktu FF_X - Seluruh Data')
-                        axes[2].set_xlabel('Tanggal')
-                        axes[2].set_ylabel('Kecepatan Angin (m/s)')
-                        st.pyplot(fig2)
+        # --- Uji Stasioneritas ADF dan ACF/PACF Seluruh Data ---
+        if 'FF_X' in df_musim.columns and 'TANGGAL' in df_musim.columns:
+            try:
+                ts = df_musim['FF_X'].dropna()
+        
+                st.subheader("📊 Uji Stasioneritas ADF - Seluruh Data")
+                result = adfuller(ts, autolag='AIC')
+                st.write(f"**ADF Statistic**: {result[0]:.4f}")
+                st.write(f"**p-value**: {result[1]:.4f}")
+                st.write("**Critical Values:**")
+                for key, value in result[4].items():
+                    st.write(f"  - {key}: {value:.4f}")
+                if result[1] <= 0.05:
+                    st.success("✅ Data stasioner (tolak H0)")
+                else:
+                    st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
+        
+                st.subheader("🔍 Visualisasi ACF, PACF, dan Time Series (Seluruh Data)")
+                fig2, axes = plt.subplots(3, 1, figsize=(12, 12))
+                plt.subplots_adjust(hspace=0.5)
+                plot_acf(ts, lags=50, ax=axes[0])
+                axes[0].set_title('ACF - Seluruh Data')
+                plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
+                axes[1].set_title('PACF - Seluruh Data')
+                axes[2].plot(df_musim['TANGGAL'], ts, color='blue')
+                axes[2].set_title('Seri Waktu FF_X - Seluruh Data')
+                axes[2].set_xlabel('Tanggal')
+                axes[2].set_ylabel('Kecepatan Angin (m/s)')
+                st.pyplot(fig2)
+        
             except Exception as e:
                 st.error(f"❌ Gagal memproses kolom TANGGAL: {e}")
         else:
             st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
+
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
 
