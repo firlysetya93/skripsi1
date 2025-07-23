@@ -157,6 +157,12 @@ if menu == "Preprocessing & Analisis Musim":
         
 if menu == "Normalisasi dan Splitting Data":
     st.write("Menu Normalisasi dan Splitting Data dipilih")
+        # Cek apakah df_musim sudah tersedia
+    if "df_musim" not in st.session_state:
+        st.warning("Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu di menu sebelumnya.")
+        st.stop()
+    else:
+        df_musim = st.session_state.df_musim
     values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled = scaler.fit_transform(values)
