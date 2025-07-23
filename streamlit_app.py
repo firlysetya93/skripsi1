@@ -84,8 +84,9 @@ else:
 st.set_page_config(page_title="Imputasi Musiman FF_X", layout="wide")
 st.title("🌦️ Imputasi Missing Value Berdasarkan Musim")
 
+if st.checkbox("Tampilkan Data dengan Bulan dan Musim"):
     st.subheader("Data Setelah Menambahkan Bulan dan Musim")
-    st.dataframe(df.head())
+    st.write(df_musim.head())
 
     # Cek missing values
     st.subheader("Missing Values per Musim")
