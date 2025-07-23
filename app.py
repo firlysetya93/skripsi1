@@ -89,55 +89,54 @@ if menu == "Preprocessing & Analisis Musim":
                 ax1.grid(True)
                 ax1.set_xticks(rata_tahunan.index)
 
-                st.pyplot(fig)
-            else:
-                st.warning("⚠️ Kolom 'FF_X' tidak ditemukan dalam dataset.")
+                st.pyplot(fig1)
+
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat mengolah kolom TANGGAL: {e}")
         else:
-            st.warning("⚠️ Data musiman belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
-# ======================= #
+            st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
+
+# === Menu 2: Stasioneritas & ACF PACF ===
 elif menu == "Stasioneritas & ACF PACF":
     st.header("📉 Uji Stasioneritas (ADF) dan Plot ACF/PACF")
 
-    # Ambil data FF_X dan hapus nilai NaN
-    ts = df['FF_X'].dropna()
+    if 'df' in locals() or 'df' in globals():
+        ts = df['FF_X'].dropna()
 
-    # --- Uji Stasioneritas ADF ---
-    st.subheader("📉 Uji Stasioneritas: Augmented Dickey-Fuller (ADF)")
-    result = adfuller(ts, autolag='AIC')
+        # --- Uji Stasioneritas ADF ---
+        st.subheader("📉 Uji Stasioneritas: Augmented Dickey-Fuller (ADF)")
+        result = adfuller(ts, autolag='AIC')
 
-    st.write(f"**ADF Statistic:** {result[0]:.4f}")
-    st.write(f"**p-value:** {result[1]:.4f}")
+        st.write(f"**ADF Statistic:** {result[0]:.4f}")
+        st.write(f"**p-value:** {result[1]:.4f}")
 
-    st.write("**Critical Values:**")
-    for key, value in result[4].items():
-        st.write(f" - {key}: {value:.4f}")
+        st.write("**Critical Values:**")
+        for key, value in result[4].items():
+            st.write(f" - {key}: {value:.4f}")
 
-    if result[1] <= 0.05:
-        st.success("✅ Data stasioner (tolak H0)")
-    else:
-        st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
-
-    # --- Plot ACF, PACF, dan Time Series ---
-    st.subheader("📊 Visualisasi Time Series, ACF, dan PACF")
-
-    fig, axes = plt.subplots(3, 1, figsize=(18, 14))
-    plt.subplots_adjust(hspace=0.5)
-
-    plot_acf(ts, lags=50, ax=axes[0])
-    axes[0].set_title('Autocorrelation Function (ACF) - FF_X')
-
-    plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
-    axes[1].set_title('Partial Autocorrelation Function (PACF) - FF_X')
-
-    axes[2].plot(ts, color='blue')
-    axes[2].set_title('Time Series Plot - FF_X')
-    axes[2].set_xlabel('Tanggal')
-    axes[2].set_ylabel('Kecepatan Angin (FF_X)')
-
-    st.pyplot(fig)
-
+        if result[1] <= 0.05:
+            st.success("✅ Data stasioner (tolak H0)")
         else:
-            st.warning("⚠️ Kolom tidak valid dipilih.")
+            st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
+
+        # --- Plot ACF, PACF, dan Time Series ---
+        st.subheader("📊 Visualisasi Time Series, ACF, dan PACF")
+
+        fig, axes = plt.subplots(3, 1, figsize=(18, 14))
+        plt.subplots_adjust(hspace=0.5)
+
+        plot_acf(ts, lags=50, ax=axes[0])
+        axes[0].set_title('Autocorrelation Function (ACF) - FF_X')
+
+        plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
+        axes[1].set_title('Partial Autocorrelation Function (PACF) - FF_X')
+
+        axes[2].plot(ts, color='blue')
+        axes[2].set_title('Time Series Plot - FF_X')
+        axes[2].set_xlabel('Tanggal')
+        axes[2].set_ylabel('Kecepatan Angin (FF_X)')
+
+        st.pyplot(fig)
     else:
         st.warning("⚠️ Data musiman belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
         
