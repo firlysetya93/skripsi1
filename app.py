@@ -88,11 +88,12 @@ if menu == "Preprocessing & Analisis Musim":
                 ax1.set_title('Rata-Rata Kecepatan Angin per Tahun')
                 ax1.grid(True)
                 ax1.set_xticks(rata_tahunan.index)
-                st.pyplot(fig1)
+
+                st.pyplot(fig)
+            else:
+                st.warning("⚠️ Kolom 'FF_X' tidak ditemukan dalam dataset.")
         else:
-            st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
-    else:
-        st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
+            st.warning("⚠️ Data musiman belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
 # ======================= #
 elif menu == "Stasioneritas & ACF PACF":
     st.header("📉 Uji Stasioneritas (ADF) dan Plot ACF/PACF")
