@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
-menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Stasioneritas & ACF PACF", "Preprocessing", "Splitting Data", "📊 Split Data Time Series"])
+menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi & Split Data", "Tuning Hyperparameter LSTM"])
 
 # === Menu 1: Preprocessing & Analisis Musim ===
 if menu == "Preprocessing & Analisis Musim":
@@ -75,6 +75,7 @@ if menu == "Preprocessing & Analisis Musim":
                 df_musim = pd.concat(dfs.values(), ignore_index=True)
                 df_musim = df_musim.sort_values('TANGGAL').reset_index(drop=True)
                 st.session_state['df_musim'] = df_musim
+
                 st.subheader("📅 Data Gabungan (Diurutkan Berdasarkan Tanggal)")
                 st.dataframe(df_musim.head(1000))
 
@@ -88,162 +89,71 @@ if menu == "Preprocessing & Analisis Musim":
                 ax1.set_title('Rata-Rata Kecepatan Angin per Tahun')
                 ax1.grid(True)
                 ax1.set_xticks(rata_tahunan.index)
-
                 st.pyplot(fig1)
+            # --- Uji Stasioneritas ADF dan ACF/PACF Seluruh Data ---
+                st.subheader("📉 Uji Stasioneritas (ADF Test) per Musim")
+                adf_results = []
+                for season, df_season in dfs.items():
+                    series = df_season['FF_X'].dropna()
+                    adf_result = adfuller(series)
+                    adf_results.append({
+                        'Musim': season,
+                        'ADF Statistic': adf_result[0],
+                        'p-value': adf_result[1],
+                        'Critical Value 5%': adf_result[4]['5%']
+                    })
+                st.dataframe(pd.DataFrame(adf_results))
 
+                st.subheader("🔁 ACF dan PACF Plot per Musim (100 Lags)")
+                # Pastikan kolom 'TANGGAL' menjadi datetime
+                if 'TANGGAL' in df_musim.columns:
+                    df_musim['TANGGAL'] = pd.to_datetime(df_musim['TANGGAL'])
+                    df_musim.set_index('TANGGAL', inplace=True)
+        
+                # Ambil hanya kolom FF_X dan drop NaN
+                if 'FF_X' in df_musim.columns:
+                    ts = df_musim['FF_X'].dropna()
+        
+                    # --- Uji Stasioneritas: Augmented Dickey-Fuller (ADF) ---
+                    result = adfuller(ts, autolag='AIC')
+        
+                    st.markdown("### Hasil Uji ADF untuk FF_X")
+                    st.write(f"**ADF Statistic** : {result[0]:.4f}")
+                    st.write(f"**p-value**       : {result[1]:.4f}")
+                    st.write("**Critical Values:**")
+                    for key, value in result[4].items():
+                        st.write(f"   {key} : {value:.4f}")
+                    if result[1] <= 0.05:
+                        st.success("✅ Data stasioner (tolak H0)")
+                    else:
+                        st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
+        
+                    # --- Plot ACF, PACF, dan Time Series ---
+                    fig, axes = plt.subplots(3, 1, figsize=(16, 12))
+                    plt.subplots_adjust(hspace=0.5)
+        
+                    # Plot ACF
+                    plot_acf(ts, lags=50, ax=axes[0])
+                    axes[0].set_title("Autocorrelation Function (ACF) - FF_X")
+        
+                    # Plot PACF
+                    plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
+                    axes[1].set_title("Partial Autocorrelation Function (PACF) - FF_X")
+        
+                    # Plot Time Series
+                    axes[2].plot(ts, color='blue')
+                    axes[2].set_title("Time Series Plot - FF_X")
+                    axes[2].set_xlabel("Tanggal")
+                    axes[2].set_ylabel("Kecepatan Angin (FF_X)")
+        
+                    st.pyplot(fig)
+                st.success("✅ Preprocessing dan analisis musiman selesai! Data siap digunakan di menu berikutnya.")
             except Exception as e:
-                st.error(f"Terjadi kesalahan saat mengolah kolom TANGGAL: {e}")
+                st.error(f"❌ Terjadi kesalahan saat memproses tanggal: {e}")
         else:
             st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
-
-# === Menu 2: Stasioneritas & ACF PACF ===
-elif menu == "Stasioneritas & ACF PACF":
-    st.header("📉 Uji Stasioneritas (ADF) dan Plot ACF/PACF")
-
-    if 'df' in locals() or 'df' in globals():
-        ts = df['FF_X'].dropna()
-
-        # --- Uji Stasioneritas ADF ---
-        st.subheader("📉 Uji Stasioneritas: Augmented Dickey-Fuller (ADF)")
-        result = adfuller(ts, autolag='AIC')
-
-        st.write(f"**ADF Statistic:** {result[0]:.4f}")
-        st.write(f"**p-value:** {result[1]:.4f}")
-
-        st.write("**Critical Values:**")
-        for key, value in result[4].items():
-            st.write(f" - {key}: {value:.4f}")
-
-        if result[1] <= 0.05:
-            st.success("✅ Data stasioner (tolak H0)")
-        else:
-            st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
-
-        # --- Plot ACF, PACF, dan Time Series ---
-        st.subheader("📊 Visualisasi Time Series, ACF, dan PACF")
-
-        fig, axes = plt.subplots(3, 1, figsize=(18, 14))
-        plt.subplots_adjust(hspace=0.5)
-
-        plot_acf(ts, lags=50, ax=axes[0])
-        axes[0].set_title('Autocorrelation Function (ACF) - FF_X')
-
-        plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
-        axes[1].set_title('Partial Autocorrelation Function (PACF) - FF_X')
-
-        axes[2].plot(ts, color='blue')
-        axes[2].set_title('Time Series Plot - FF_X')
-        axes[2].set_xlabel('Tanggal')
-        axes[2].set_ylabel('Kecepatan Angin (FF_X)')
-
-        st.pyplot(fig)
     else:
-        st.warning("⚠️ Data musiman belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
-        
-elif menu == "Preprocessing":
-    st.header("⚙️ Preprocessing Data Kecepatan Angin")
-
-    # Pastikan tidak ada nilai NaN
-    if df['FF_X'].isnull().sum() > 0:
-        st.warning("⚠️ Terdapat nilai kosong. Silakan lakukan imputasi atau drop sebelum preprocessing.")
-    else:
-        # --- Normalisasi ---
-        st.subheader("🔢 Normalisasi (Min-Max Scaling)")
-        values = df['FF_X'].values.astype('float32')
-        values_reshaped = values.reshape(-1, 1)
-
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled_values = scaler.fit_transform(values_reshaped)
-
-        df['FF_X_Scaled'] = scaled_values
-        st.dataframe(df[['FF_X', 'FF_X_Scaled']].head())
-
-        # --- Pembagian Data Train-Test ---
-        st.subheader("📊 Pembagian Data Train dan Test (Tanpa Shuffle, 80:20)")
-
-        train_size = int(len(df) * 0.8)
-        df_train = df.iloc[:train_size]
-        df_test = df.iloc[train_size:]
-
-        st.write(f"Jumlah data pelatihan: {df_train.shape[0]}")
-        st.write(f"Jumlah data pengujian: {df_test.shape[0]}")
-
-        # Plot
-        features = ['FF_X']
-        for feature in features:
-            fig, ax = plt.subplots(figsize=(18,6))
-            ax.plot(df_train.index, df_train[feature], label='Training', color='blue')
-            ax.plot(df_test.index, df_test[feature], label='Testing', color='orange')
-            ax.set_title(f'Pembagian Data Train dan Test - {feature}')
-            ax.set_xlabel('Tanggal')
-            ax.set_ylabel('Kecepatan Angin (FF_X)')
-            ax.legend()
-            st.pyplot(fig)
-            
-# Tambahan menu baru untuk Splitting Data
-elif selected_menu == "Splitting Data":
-    st.subheader("Transformasi Supervised Learning dan Pembagian Data")
-
-    # Tampilkan grafik FF_X secara umum
-    st.line_chart(df_musim['FF_X'])
-
-    # Normalisasi hanya pada kolom FF_X
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled = scaler.fit_transform(df_musim[['FF_X']])
-
-    # Fungsi untuk mengubah data menjadi supervised learning
-    def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
-        df = pd.DataFrame(data)
-        n_vars = df.shape[1]
-        cols, names = [], []
-
-        # input sequence (t-n, ... t-1)
-        for i in range(n_in, 0, -1):
-            cols.append(df.shift(i))
-            names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
-
-        # forecast sequence (t, t+1, ..., t+n)
-        for i in range(0, n_out):
-            cols.append(df.shift(-i))
-            if i == 0:
-                names += [f'var{j+1}(t)' for j in range(n_vars)]
-            else:
-                names += [f'var{j+1}(t+{i})' for j in range(n_vars)]
-
-        agg = pd.concat(cols, axis=1)
-        agg.columns = names
-
-        if dropnan:
-            agg.dropna(inplace=True)
-        return agg
-
-    # Parameter input lag (jumlah hari sebelumnya yang dipakai)
-    n_days = st.slider("Pilih jumlah lag (hari sebelumnya)", min_value=1, max_value=30, value=6)
-
-    # Ubah ke supervised format
-    reframed = series_to_supervised(scaled, n_in=n_days, n_out=1)
-    st.write("Dataset setelah transformasi supervised:")
-    st.dataframe(reframed.head())
-
-    # Ambil nilai dan split train/test tanpa shuffle
-    values = reframed.values
-    split_index = int(len(values) * 0.8)
-    train = values[:split_index, :]
-    test = values[split_index:, :]
-
-    st.write(f"Jumlah data: {len(values)}")
-    st.write(f"Jumlah data train: {len(train)}")
-    st.write(f"Jumlah data test: {len(test)}")
-
-    # Info dimensi
-    st.success(f"Bentuk train: {train.shape}, Bentuk test: {test.shape}")
-
-    # Simpan untuk sesi berikutnya
-    st.session_state['train'] = train
-    st.session_state['test'] = test
-    st.session_state['scaler'] = scaler
-    st.session_state['n_days'] = n_days
-
+        st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
 # === Menu 2: Normalisasi & Train-Test Split ===
 elif menu == "📊 Split Data Time Series":
     st.subheader("📊 Split Data Time Series: Train dan Test Set")
