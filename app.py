@@ -91,44 +91,41 @@ if menu == "Preprocessing & Analisis Musim":
                 ax1.set_xticks(rata_tahunan.index)
                 st.pyplot(fig1)
             # --- Uji Stasioneritas ADF dan ACF/PACF Seluruh Data ---
-        # --- Uji Stasioneritas ADF dan ACF/PACF Seluruh Data ---
-                if 'FF_X' in df_musim.columns and 'TANGGAL' in df_musim.columns:
-                    try:
-                        ts = df_musim['FF_X'].dropna()
-                
-                        st.subheader("📊 Uji Stasioneritas ADF - Seluruh Data")
-                        result = adfuller(ts, autolag='AIC')
-                        st.write(f"**ADF Statistic**: {result[0]:.4f}")
-                        st.write(f"**p-value**: {result[1]:.4f}")
-                        st.write("**Critical Values:**")
-                        for key, value in result[4].items():
-                            st.write(f"  - {key}: {value:.4f}")
-                        if result[1] <= 0.05:
-                            st.success("✅ Data stasioner (tolak H0)")
-                        else:
-                            st.warning("⚠️ Data tidak stasioner (gagal tolak H0)")
-                
-                        st.subheader("🔍 Visualisasi ACF, PACF, dan Time Series (Seluruh Data)")
-                        fig2, axes = plt.subplots(3, 1, figsize=(12, 12))
-                        plt.subplots_adjust(hspace=0.5)
-                        plot_acf(ts, lags=50, ax=axes[0])
-                        axes[0].set_title('ACF - Seluruh Data')
-                        plot_pacf(ts, lags=50, ax=axes[1], method='ywm')
-                        axes[1].set_title('PACF - Seluruh Data')
-                        axes[2].plot(df_musim['TANGGAL'], ts, color='blue')
-                        axes[2].set_title('Seri Waktu FF_X - Seluruh Data')
-                        axes[2].set_xlabel('Tanggal')
-                        axes[2].set_ylabel('Kecepatan Angin (m/s)')
-                        st.pyplot(fig2)
-                
-                    except Exception as e:
-                        st.error(f"❌ Gagal memproses kolom TANGGAL: {e}")
-                else:
-                    st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
+ 
+                st.subheader("📉 Uji Stasioneritas (ADF Test) per Musim")
+                adf_results = []
+                for season, df_season in dfs.items():
+                    series = df_season['FF_X'].dropna()
+                    adf_result = adfuller(series)
+                    adf_results.append({
+                        'Musim': season,
+                        'ADF Statistic': adf_result[0],
+                        'p-value': adf_result[1],
+                        'Critical Value 5%': adf_result[4]['5%']
+                    })
+                st.dataframe(pd.DataFrame(adf_results))
 
+                st.subheader("🔁 ACF dan PACF Plot per Musim (100 Lags)")
+                for season, df_season in dfs.items():
+                    st.markdown(f"### Musim: {season}")
+                    series = df_season['FF_X'].dropna()
+
+                    fig_acf, ax_acf = plt.subplots(figsize=(8, 3))
+                    plot_acf(series, lags=100, ax=ax_acf)
+                    ax_acf.set_title(f"ACF - {season}")
+                    st.pyplot(fig_acf)
+
+                    fig_pacf, ax_pacf = plt.subplots(figsize=(8, 3))
+                    plot_pacf(series, lags=100, ax=ax_pacf, method='ywm')
+                    ax_pacf.set_title(f"PACF - {season}")
+                    st.pyplot(fig_pacf)
+                st.success("✅ Preprocessing dan analisis musiman selesai! Data siap digunakan di menu berikutnya.")
+            except Exception as e:
+                st.error(f"❌ Terjadi kesalahan saat memproses tanggal: {e}")
+        else:
+            st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
-
 # === Menu 2: Normalisasi & Train-Test Split ===
 elif menu == "📊 Split Data Time Series":
     st.subheader("📊 Split Data Time Series: Train dan Test Set")
