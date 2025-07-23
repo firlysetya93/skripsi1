@@ -17,31 +17,29 @@ st.title("🔍 Pemeriksaan Missing Values dalam Dataset")
 # Upload file
 uploaded_file = st.file_uploader("📤 Upload file Excel", type=["xlsx"])
 
-if uploaded_file is not None:
-    # Baca file Excel
-    df = pd.read_excel(uploaded_file)
+# if uploaded_file is not None:
+#     # Baca file Excel
+#     df = pd.read_excel(uploaded_file)
 
-    st.subheader("📊 Preview Data (5 Baris Pertama)")
-    st.dataframe(df.head())
+#     st.subheader("📊 Preview Data (5 Baris Pertama)")
+#     st.dataframe(df.head())
 
-    # Hitung missing values per kolom
-    st.subheader("🧩 Jumlah Missing Values per Kolom")
-    missing_values = df.isnull().sum()
-    st.dataframe(missing_values[missing_values > 0])
+#     # Hitung missing values per kolom
+#     st.subheader("🧩 Jumlah Missing Values per Kolom")
+#     missing_values = df.isnull().sum()
+#     st.dataframe(missing_values[missing_values > 0])
 
-    # Tampilkan baris yang memiliki NaN pada kolom 'FF_X'
-    if 'FF_X' in df.columns:
-        st.subheader("🔎 Baris dengan Missing Values pada Kolom 'FF_X'")
-        missing_ffx_rows = df[df['FF_X'].isnull()]
-        st.dataframe(missing_ffx_rows)
-    else:
-        st.warning("⚠️ Kolom 'FF_X' tidak ditemukan dalam dataset.")
-else:
-    st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
-import streamlit as st
-import pandas as pd
+#     # Tampilkan baris yang memiliki NaN pada kolom 'FF_X'
+#     if 'FF_X' in df.columns:
+#         st.subheader("🔎 Baris dengan Missing Values pada Kolom 'FF_X'")
+#         missing_ffx_rows = df[df['FF_X'].isnull()]
+#         st.dataframe(missing_ffx_rows)
+#     else:
+#         st.warning("⚠️ Kolom 'FF_X' tidak ditemukan dalam dataset.")
+# else:
+#     st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
 
-st.title("📈 Analisis Musiman Kecepatan Angin")
+# st.title("📈 Analisis Musiman Kecepatan Angin")
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
@@ -51,7 +49,7 @@ if uploaded_file is not None:
     df['Bulan'] = df['TANGGAL'].dt.month
     def determine_season(month):
         if month in [12, 1, 2]:
-            return 'HUJAN'
+            return 'HUJAN's
         elif month in [3, 4, 5]:
             return 'PANCAROBA I'
         elif month in [6, 7, 8]:
@@ -161,10 +159,9 @@ if uploaded_file is not None:
     df_musim = pd.concat(dfs.values(), ignore_index=True)
     df_musim = df_musim.sort_values('TANGGAL').reset_index(drop=True)
 
-    # --- Uji Stasioneritas (ADF) dan Plot ---
-    st.subheader("🧪 Uji Stasioneritas ADF & Plot ACF/PACF")
-    ts = df_musim['FF_X'].dropna()
-
+# --- Uji Stasioneritas (ADF) dan Plot ---
+st.subheader("🧪 Uji Stasioneritas ADF & Plot ACF/PACF")
+ts = df_musim['FF_X'].dropna()
     result = adfuller(ts, autolag='AIC')
     st.markdown("#### Hasil Uji ADF:")
     st.write(f"**ADF Statistic**: {result[0]:.4f}")
@@ -196,6 +193,7 @@ if uploaded_file is not None:
     st.pyplot(fig2)
 else:
     st.info("Silakan upload file Excel (.xlsx) terlebih dahulu.")
+    
 st.subheader("📈 Normalisasi & Pembagian Data Train-Test")
 
 # Pastikan df_musim sudah tersedia sebelumnya dan kolom 'FF_X' tidak kosong
@@ -260,111 +258,111 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
         agg.dropna(inplace=True)
     return agg
 
-# Ambil data dari session_state
-df_musim = st.session_state.get("df_musim", None)
-
-if df_musim is not None:
-    st.success("Data musim berhasil dimuat.")
+    # Ambil data dari session_state
+    df_musim = st.session_state.get("df_musim", None)
     
-    # Normalisasi
-    scaler = MinMaxScaler(feature_range=(0,1))
-    scaled = scaler.fit_transform(df_musim[['FF_X']])
+    if df_musim is not None:
+        st.success("Data musim berhasil dimuat.")
+        
+        # Normalisasi
+        scaler = MinMaxScaler(feature_range=(0,1))
+        scaled = scaler.fit_transform(df_musim[['FF_X']])
+        
+        # Parameter
+        n_days = st.slider("Pilih Jumlah Lag (n_days)", 1, 30, 6)
+        n_features = 1
+        
+        # Transformasi menjadi supervised
+        reframed = series_to_supervised(scaled, n_days, 1)
+        st.write(f"Dimensi data hasil transformasi: {reframed.shape}")
+        st.dataframe(reframed.head())
     
-    # Parameter
-    n_days = st.slider("Pilih Jumlah Lag (n_days)", 1, 30, 6)
-    n_features = 1
+        # Simpan reframed ke session_state
+        st.session_state['reframed'] = reframed
     
-    # Transformasi menjadi supervised
-    reframed = series_to_supervised(scaled, n_days, 1)
-    st.write(f"Dimensi data hasil transformasi: {reframed.shape}")
-    st.dataframe(reframed.head())
-
-    # Simpan reframed ke session_state
-    st.session_state['reframed'] = reframed
-
-    # Ambil nilai sebagai numpy array
-    values = reframed.values
-    st.session_state['values'] = values
-
-    # Bagi fitur dan target (misal 1 kolom terakhir adalah target)
-    n_obs = n_days * n_features
-    X = values[:, :n_obs]
-    y = values[:, -1]
+        # Ambil nilai sebagai numpy array
+        values = reframed.values
+        st.session_state['values'] = values
     
-    # Simpan X dan y ke session_state
-    st.session_state['X'] = X
-    st.session_state['y'] = y
-
-    # Split data
-    test_size = st.slider("Test Size (%)", 5, 50, 20)
-    train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=test_size/100, shuffle=False)
-
-    st.write(f"Train X shape: {train_X.shape}")
-    st.write(f"Test X shape: {test_X.shape}")
-
-    # Simpan ke session_state
-    st.session_state['train_X'] = train_X
-    st.session_state['test_X'] = test_X
-    st.session_state['train_y'] = train_y
-    st.session_state['test_y'] = test_y
-
-    # Plot train vs test target
-    fig, ax = plt.subplots(figsize=(20,5))
-    ax.plot(range(len(train_y)), train_y, label='Train Target')
-    ax.plot(range(len(train_y), len(train_y) + len(test_y)), test_y, label='Test Target', color='orange')
-    ax.set_title('Pembagian Data Train dan Test pada Target (y)')
-    ax.legend()
-    st.pyplot(fig)
-
-else:
-    st.warning("Data musim belum tersedia di session_state.")
-# Lanjutan dari pipeline Streamlit sebelumnya
-with st.expander("7. Transformasi Supervised dan Pembagian Data"):
-    st.subheader("Transformasi ke Format Supervised Learning")
+        # Bagi fitur dan target (misal 1 kolom terakhir adalah target)
+        n_obs = n_days * n_features
+        X = values[:, :n_obs]
+        y = values[:, -1]
+        
+        # Simpan X dan y ke session_state
+        st.session_state['X'] = X
+        st.session_state['y'] = y
     
-    # Ambil nilai dari dataframe hasil reframing
-    values = reframed.values
-
-    # Simpan index tanggal dari hasil reframing
-    date_reframed = df_musim.index[reframed.index]
-
-    # Membagi data train dan test (tanpa shuffle)
-    train_size = int(len(values) * 0.8)
-    train, test = values[:train_size], values[train_size:]
-
-    # Bagi juga indeks tanggal
-    date_train = date_reframed[:len(train)]
-    date_test = date_reframed[len(train):]
-
-    st.write(f"Jumlah data: {len(values)}")
-    st.write(f"Jumlah train : {len(train)} ({date_train.min().date()} s.d. {date_train.max().date()})")
-    st.write(f"Jumlah test  : {len(test)} ({date_test.min().date()} s.d. {date_test.max().date()})")
-
-    # Pisahkan input (X) dan target (y)
-    n_obs = n_days * n_features  # input shape
-    train_X, train_y = train[:, :n_obs], train[:, -1]
-    test_X, test_y = test[:, :n_obs], test[:, -1]
-
-    # Reshape ke bentuk 3D untuk LSTM
-    X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
-    X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
-    y_train = train_y.reshape(-1, 1)
-    y_test = test_y.reshape(-1, 1)
-
-    st.write(f"Total fitur per timestep: {n_features}")
-    st.write(f"X_train shape: {X_train.shape}")
-    st.write(f"y_train shape: {y_train.shape}")
-    st.write(f"X_test shape: {X_test.shape}")
-    st.write(f"y_test shape: {y_test.shape}")
-
-    with st.expander("Contoh Struktur Data"):
-        st.write("Contoh data input (X_train[0]):")
-        st.write(X_train[0])
-        st.write("Contoh data output (y_train[0]):")
-        st.write(y_train[0])
-
-# --- Judul Aplikasi ---
-st.title("LSTM Hyperparameter Tuning with Optuna")
+        # Split data
+        test_size = st.slider("Test Size (%)", 5, 50, 20)
+        train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=test_size/100, shuffle=False)
+    
+        st.write(f"Train X shape: {train_X.shape}")
+        st.write(f"Test X shape: {test_X.shape}")
+    
+        # Simpan ke session_state
+        st.session_state['train_X'] = train_X
+        st.session_state['test_X'] = test_X
+        st.session_state['train_y'] = train_y
+        st.session_state['test_y'] = test_y
+    
+        # Plot train vs test target
+        fig, ax = plt.subplots(figsize=(20,5))
+        ax.plot(range(len(train_y)), train_y, label='Train Target')
+        ax.plot(range(len(train_y), len(train_y) + len(test_y)), test_y, label='Test Target', color='orange')
+        ax.set_title('Pembagian Data Train dan Test pada Target (y)')
+        ax.legend()
+        st.pyplot(fig)
+    
+    else:
+        st.warning("Data musim belum tersedia di session_state.")
+    # Lanjutan dari pipeline Streamlit sebelumnya
+    with st.expander("7. Transformasi Supervised dan Pembagian Data"):
+        st.subheader("Transformasi ke Format Supervised Learning")
+        
+        # Ambil nilai dari dataframe hasil reframing
+        values = reframed.values
+    
+        # Simpan index tanggal dari hasil reframing
+        date_reframed = df_musim.index[reframed.index]
+    
+        # Membagi data train dan test (tanpa shuffle)
+        train_size = int(len(values) * 0.8)
+        train, test = values[:train_size], values[train_size:]
+    
+        # Bagi juga indeks tanggal
+        date_train = date_reframed[:len(train)]
+        date_test = date_reframed[len(train):]
+    
+        st.write(f"Jumlah data: {len(values)}")
+        st.write(f"Jumlah train : {len(train)} ({date_train.min().date()} s.d. {date_train.max().date()})")
+        st.write(f"Jumlah test  : {len(test)} ({date_test.min().date()} s.d. {date_test.max().date()})")
+    
+        # Pisahkan input (X) dan target (y)
+        n_obs = n_days * n_features  # input shape
+        train_X, train_y = train[:, :n_obs], train[:, -1]
+        test_X, test_y = test[:, :n_obs], test[:, -1]
+    
+        # Reshape ke bentuk 3D untuk LSTM
+        X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
+        X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
+        y_train = train_y.reshape(-1, 1)
+        y_test = test_y.reshape(-1, 1)
+    
+        st.write(f"Total fitur per timestep: {n_features}")
+        st.write(f"X_train shape: {X_train.shape}")
+        st.write(f"y_train shape: {y_train.shape}")
+        st.write(f"X_test shape: {X_test.shape}")
+        st.write(f"y_test shape: {y_test.shape}")
+    
+        with st.expander("Contoh Struktur Data"):
+            st.write("Contoh data input (X_train[0]):")
+            st.write(X_train[0])
+            st.write("Contoh data output (y_train[0]):")
+            st.write(y_train[0])
+    
+    # --- Judul Aplikasi ---
+    st.title("LSTM Hyperparameter Tuning with Optuna")
 
 # --- Menampilkan dataset yang digunakan (jika tersedia) ---
 if 'df' in st.session_state:
