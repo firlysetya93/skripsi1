@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
-menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "🔄 Preprocessing & Splitting Data"])
+menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data"])
 
 # === Menu 1: Preprocessing & Analisis Musim ===
 if menu == "Preprocessing & Analisis Musim":
@@ -154,13 +154,15 @@ if menu == "Preprocessing & Analisis Musim":
             st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
-# === Menu 2: Normalisasi & Train-Test Split ===
+        
 if selected_menu == "Normalisasi dan Splitting Data":
     st.subheader("📉 Normalisasi Fitur 'FF_X'")
+
     values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled = scaler.fit_transform(values)
     df_musim['FF_X_scaled'] = scaled
+
     st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
 
     # --- 2. Transformasi ke Supervised Learning ---
@@ -171,11 +173,12 @@ if selected_menu == "Normalisasi dan Splitting Data":
         n_vars = df.shape[1]
         cols, names = [], []
 
-        # input (t-n ... t-1)
+        # input sequence (t-n, ... t-1)
         for i in range(n_in, 0, -1):
             cols.append(df.shift(i))
             names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
-        # output (t)
+
+        # output sequence (t, t+1, ..., t+n)
         for i in range(0, n_out):
             cols.append(df.shift(-i))
             if i == 0:
@@ -198,6 +201,7 @@ if selected_menu == "Normalisasi dan Splitting Data":
 
     # --- 3. Splitting Data Train/Test ---
     st.subheader("✂️ Splitting Data (Tanpa Shuffle, Rasio 80/20)")
+
     values = reframed.values
     date_reframed = df_musim.index[reframed.index]
 
@@ -210,7 +214,7 @@ if selected_menu == "Normalisasi dan Splitting Data":
     st.write(f"🟦 Train: {len(train)} | Tanggal: {date_train.min()} → {date_train.max()}")
     st.write(f"🟧 Test: {len(test)} | Tanggal: {date_test.min()} → {date_test.max()}")
 
-    # Visualisasi pembagian
+    # Visualisasi
     fig, ax = plt.subplots(figsize=(20, 5))
     ax.plot(date_train, train[:, -1], label='Train', color='blue')
     ax.plot(date_test, test[:, -1], label='Test', color='orange')
@@ -241,12 +245,11 @@ Contoh struktur input LSTM (X_train[0]):
 Target prediksi (y_train[0]): {y_train[0][0]}
     """)
 
-    # --- Simpan ke session_state ---
+    # --- Simpan ke session_state untuk digunakan di menu selanjutnya ---
     st.session_state.scaler = scaler
     st.session_state.reframed = reframed
     st.session_state.X_train = X_train
     st.session_state.y_train = y_train
     st.session_state.X_test = X_test
     st.session_state.y_test = y_test
-
 
