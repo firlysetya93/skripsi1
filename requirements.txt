@@ -1,6 +1,7 @@
-streamlit
+streamlit==1.35.0
 pandas
 numpy
-plotly
-statsmodels
+matplotlib
 scikit-learn
+statsmodels
+openpyxl
