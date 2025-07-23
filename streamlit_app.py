@@ -4,6 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+import optuna
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+import time
 
 st.title("🔍 Pemeriksaan Missing Values dalam Dataset")
 
@@ -356,3 +362,62 @@ with st.expander("7. Transformasi Supervised dan Pembagian Data"):
         st.write(X_train[0])
         st.write("Contoh data output (y_train[0]):")
         st.write(y_train[0])
+
+st.header("🔧 Tuning Hyperparameter LSTM dengan Optuna")
+
+if 'X_train' in locals():
+    st.success("Data berhasil disiapkan! Siap melakukan tuning hyperparameter.")
+
+    # Define the objective function for Optuna
+    def objective(trial):
+        lstm_units = trial.suggest_int('lstm_units', 10, 200)
+        dense_units = trial.suggest_int('dense_units', 10, 200)
+        dropout_rate = trial.suggest_float('dropout_rate', 0.0, 0.5)
+        recurrent_dropout_rate = trial.suggest_float('recurrent_dropout_rate', 0.0, 0.5)
+        learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True)
+        epochs = trial.suggest_int('epochs', 20, 100)
+        batch_size = trial.suggest_int('batch_size', 16, 128)
+
+        # Build model
+        model = Sequential()
+        model.add(LSTM(lstm_units, activation='relu', dropout=dropout_rate,
+                       recurrent_dropout=recurrent_dropout_rate,
+                       return_sequences=True,
+                       input_shape=(X_train.shape[1], X_train.shape[2])))
+        model.add(Dropout(dropout_rate))
+        model.add(LSTM(lstm_units, activation='relu',
+                       dropout=dropout_rate,
+                       recurrent_dropout=recurrent_dropout_rate))
+        model.add(Dropout(dropout_rate))
+        model.add(Dense(dense_units, activation='relu'))
+        model.add(Dense(n_features))
+
+        optimizer = Adam(learning_rate=learning_rate)
+        model.compile(optimizer=optimizer, loss='mean_squared_error')
+
+        # Early stopping
+        early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+        model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
+                  validation_data=(X_test, y_test), callbacks=[early_stopping],
+                  verbose=0, shuffle=False)
+
+        loss = model.evaluate(X_test, y_test, verbose=0)
+        return loss
+
+    if st.button("🔍 Jalankan Tuning Optuna"):
+        start_time = time.time()
+        study = optuna.create_study(direction='minimize')
+        with st.spinner("Menjalankan tuning... Mohon tunggu beberapa menit."):
+            study.optimize(objective, n_trials=50)
+        end_time = time.time()
+
+        st.success("Tuning selesai!")
+        st.write("⏱️ Waktu yang dibutuhkan:", round(end_time - start_time, 2), "detik")
+        st.subheader("🔑 Hasil Tuning Hyperparameter Terbaik")
+        st.json(study.best_params)
+
+        # Simpan best_params ke session state
+        st.session_state['best_params'] = study.best_params
+else:
+    st.warning("❗ Silakan pastikan data sudah di-preprocess dan diubah menjadi supervised sebelum menjalankan tuning.")
