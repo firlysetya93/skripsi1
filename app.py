@@ -155,7 +155,7 @@ if menu == "Preprocessing & Analisis Musim":
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
         
-if selected_menu == "Normalisasi dan Splitting Data":
+if menu == "Normalisasi dan Splitting Data":
     st.write("Menu Normalisasi dan Splitting Data dipilih")
     values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
     scaler = MinMaxScaler(feature_range=(0, 1))
