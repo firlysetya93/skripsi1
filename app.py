@@ -5,6 +5,10 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+import optuna
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
