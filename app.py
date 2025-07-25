@@ -155,22 +155,24 @@ if menu == "Preprocessing & Analisis Musim":
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
         
+# === Menu 2: Normalisasi dan Splitting Data ===
 if menu == "Normalisasi dan Splitting Data":
-    st.write("Menu Normalisasi dan Splitting Data dipilih")
-        # Cek apakah df_musim sudah tersedia
+    st.title("📏 Normalisasi dan Splitting Data")
+
     if "df_musim" not in st.session_state:
-        st.warning("Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu di menu sebelumnya.")
+        st.warning("❗ Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu di menu sebelumnya.")
         st.stop()
     else:
-        df_musim = st.session_state.df_musim
-    values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled = scaler.fit_transform(values)
-    df_musim['FF_X_scaled'] = scaled
-
-    st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
-
-    # --- 2. Transformasi ke Supervised Learning ---
+        df_musim = st.session_state['df_musim'].copy()
+        values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled = scaler.fit_transform(values)
+        df_musim['FF_X_scaled'] = scaled
+    
+        st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
+        st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
+    
+        # --- 2. Transformasi ke Supervised Learning ---
     st.subheader("🔁 Transformasi ke Supervised Learning")
 
     def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
