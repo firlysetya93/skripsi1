@@ -271,6 +271,7 @@ Target prediksi (y_train[0]): {y_train[0][0]}
     
 if menu == "Hyperparameter Tuning (LSTM)":
     st.title("🎯 Hyperparameter Tuning dengan Optuna (LSTM)")
+
     if 'X_train' not in st.session_state or 'y_train' not in st.session_state:
         st.warning("🚨 Data belum diproses! Silakan lakukan preprocessing, transformasi supervised, dan splitting terlebih dahulu.")
     else:
@@ -279,6 +280,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
         X_test = st.session_state.X_test
         y_test = st.session_state.y_test
         n_features = st.session_state.n_features
+        scaler = st.session_state.scaler
     
         n_trials = st.number_input("🔁 Jumlah Percobaan (Trials)", min_value=10, max_value=100, value=50, step=10)
     
