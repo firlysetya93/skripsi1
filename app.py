@@ -318,22 +318,20 @@ if menu == "Hyperparameter Tuning (LSTM)":
             # Tuning
         if st.button("🚀 Jalankan Tuning"):
             with st.spinner("🔍 Mencari kombinasi terbaik..."):
+
+                # ✅ Tambahkan ini
+                scaler = st.session_state.scaler
+
                 study = optuna.create_study(direction='minimize')
                 study.optimize(objective, n_trials=n_trials)
-    
+
                 st.success("🎯 Tuning selesai!")
                 st.write("Best loss:", study.best_value)
                 st.json(study.best_params)
-    
-                # Simpan best_params ke session_state
+
                 st.session_state.best_params = study.best_params
-    
                 best_params = study.best_params
-                st.success("✅ Tuning selesai!")
-                st.write("📌 **Best Parameters:**")
-                st.json(best_params)
-    
-                # Bangun ulang model dengan parameter terbaik
+
                 tuned_model = Sequential()
                 tuned_model.add(LSTM(best_params['lstm_units'], activation='relu',
                                      dropout=best_params['dropout_rate'],
@@ -347,14 +345,14 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 tuned_model.add(Dropout(best_params['dropout_rate']))
                 tuned_model.add(Dense(best_params['dense_units'], activation='relu'))
                 tuned_model.add(Dense(n_features))
-    
+
                 optimizer = Adam(learning_rate=best_params['learning_rate'])
                 tuned_model.compile(optimizer=optimizer,
                                     loss='mean_squared_error',
                                     metrics=['mae'])
-    
+
                 early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-    
+
                 history = tuned_model.fit(
                     X_train, y_train,
                     epochs=best_params['epochs'],
@@ -364,10 +362,10 @@ if menu == "Hyperparameter Tuning (LSTM)":
                     shuffle=False,
                     verbose=0
                 )
-    
+
                 test_loss, test_mae = tuned_model.evaluate(X_test, y_test, verbose=0)
                 st.success(f"✅ **Test Loss:** {test_loss:.4f} | **Test MAE:** {test_mae:.4f}")
-    
+
                 # Grafik Loss
                 st.subheader("📉 Grafik Loss Selama Training")
                 fig, ax = plt.subplots()
@@ -377,6 +375,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 ax.set_ylabel('Loss')
                 ax.legend()
                 st.pyplot(fig)
+
                 # ---------------- INVERSE TRANSFORM & PREDIKSI ---------------- #
                 st.subheader("📊 Visualisasi Prediksi dan Evaluasi")
 
@@ -384,7 +383,6 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 y_test_inverse = scaler.inverse_transform(y_test)
                 y_pred_inverse = scaler.inverse_transform(y_pred)
 
-                # Plot Prediksi vs Aktual
                 fig2, ax2 = plt.subplots(figsize=(20, 8))
                 ax2.plot(y_test_inverse[:, 0], label='Aktual')
                 ax2.plot(y_pred_inverse[:, 0], label='Prediksi')
@@ -394,25 +392,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 ax2.legend()
                 st.pyplot(fig2)
 
-                # Buat tabel hasil prediksi
-                df_prediksi = create_predictions_dataframe(y_test_inverse, y_pred_inverse, feature_name='FF_X')
-                st.write("📈 DataFrame Hasil Prediksi:")
-                st.dataframe(df_prediksi)
-
-                # Evaluasi metrik
-                df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, features)
-                st.write("📋 Evaluasi Model:")
-                st.dataframe(df_metrics)
-
-                # Tombol download CSV
-                csv = df_prediksi.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="💾 Download Hasil Prediksi (CSV)",
-                    data=csv,
-                    file_name='hasil_prediksi.csv',
-                    mime='text/csv',
-                )
-                    # --- Buat DataFrame Prediksi vs Aktual ---
+                # --- Buat DataFrame Prediksi vs Aktual ---
                 def create_predictions_dataframe(y_true, y_pred, feature_name='FF_X'):
                     y_true_flat = y_true.flatten()
                     y_pred_flat = np.round(y_pred.flatten(), 3)
@@ -424,9 +404,6 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 df_prediksi = create_predictions_dataframe(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.subheader("📋 Tabel Prediksi vs Aktual (Top 20)")
                 st.dataframe(df_prediksi.head(20))
-
-                # --- Evaluasi Metrik ---
-                from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
                 def calculate_metrics(y_true, y_pred, feature_name='FF_X'):
                     y_true = y_true.flatten()
@@ -453,6 +430,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
+
 
                 
 
