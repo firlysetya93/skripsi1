@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
-menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data", "Hyperparameter Tuning (LSTM)"])
+menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data", "Transformasi Supervised & Splitting", "Hyperparameter Tuning (LSTM)"])
 
 # === Menu 1: Preprocessing & Analisis Musim ===
 if menu == "Preprocessing & Analisis Musim":
@@ -174,47 +174,52 @@ if menu == "Normalisasi dan Splitting Data":
         st.stop()
     else:
         df_musim = st.session_state['df_musim'].copy()
-    # 3. Normalisasi kolom FF_X
+
+        # Normalisasi kolom FF_X
         values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled = scaler.fit_transform(values)
         df_musim['FF_X_scaled'] = scaled
-    
-        # 4. Simpan hasil normalisasi (scaler dan df) ke session_state
+
+        # Simpan scaler ke session_state jika dibutuhkan nanti
         st.session_state['scaler'] = scaler
-        st.session_state['df_musim_scaled'] = df_musim
-    
-        # 5. Split data 80% train - 20% test, tanpa shuffle
-        df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
-    
-        # 6. Simpan hasil split ke session_state
+
+        # Splitting tanpa shuffle: 80% train, 20% test
+        train_size = int(len(df_musim) * 0.8)
+        df_train = df_musim.iloc[:train_size]
+        df_test = df_musim.iloc[train_size:]
+
+        # Simpan hasil splitting ke session_state
         st.session_state['df_train'] = df_train
         st.session_state['df_test'] = df_test
-            
-        # 7. Tampilkan info data
-        st.subheader("📈 Informasi Data")
-        st.write(f"Jumlah total data: {len(df_musim)}")
-        st.write(f"Train set: {df_train.shape}, Test set: {df_test.shape}")
-    
-        # 8. Visualisasi pembagian data
-        st.subheader("🖼️ Visualisasi Pembagian Data Train dan Test")
-        fig, ax = plt.subplots(figsize=(22,6))
-        ax.plot(df_train.index, df_train['FF_X'], label='Training', color='blue')
-        ax.plot(df_test.index, df_test['FF_X'], label='Testing', color='orange')
-        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X')
+
+        # Info ukuran data
+        st.subheader("📊 Ukuran Data")
+        st.write("Data Train:", df_train.shape)
+        st.write("Data Test:", df_test.shape)
+
+        # Visualisasi pembagian data
+        st.subheader("📈 Visualisasi Pembagian Data Train dan Test")
+
+        fig, ax = plt.subplots(figsize=(22, 6))
+        ax.plot(df_train.index, df_train['FF_X_scaled'], label='Training', color='blue')
+        ax.plot(df_test.index, df_test['FF_X_scaled'], label='Testing', color='orange')
+        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X_scaled')
         ax.legend(loc='upper right')
         st.pyplot(fig)
+        st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
     
-        # 9. Tampilkan hasil normalisasi
-        st.subheader("🔍 Contoh Hasil Normalisasi")
-        st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
-    
-        # 10. Status
-        st.success("✅ Data telah dinormalisasi, dibagi menjadi train-test, dan disimpan.")
-    
-        # --- 2. Transformasi ke Supervised Learning ---
-    st.subheader("🔁 Transformasi ke Supervised Learning")
+# === Menu 4: Transformasi Supervised & Splitting ===
+if menu == "Transformasi Supervised & Splitting":
+    st.title("🔁 Transformasi Supervised Learning")
 
+    if "df_train" not in st.session_state:
+        st.warning("❗ Data train belum tersedia. Silakan lakukan Normalisasi dan Splitting terlebih dahulu.")
+        st.stop()
+    else:
+        df_train = st.session_state['df_train'].copy()
+
+        # Fungsi untuk transformasi supervised
         def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
             df = pd.DataFrame(data)
             n_vars = df.shape[1]
@@ -235,66 +240,86 @@ if menu == "Normalisasi dan Splitting Data":
 
             agg = pd.concat(cols, axis=1)
             agg.columns = names
+
             if dropnan:
                 agg.dropna(inplace=True)
             return agg
 
-        # 4. Parameter lag
-        n_days = st.number_input("⏳ Jumlah Lag (n_days)", min_value=1, max_value=60, value=6)
-        n_features = 1  # hanya FF_X_scaled
+        # Skala FF_X dari df_train
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled = scaler.fit_transform(df_train[['FF_X']])
 
-        reframed = series_to_supervised(scaled, n_days, 1)
+        # Set parameter input (lagging)
+        n_days = st.slider("⏳ Jumlah Hari Input (Lag)", min_value=1, max_value=30, value=6)
+        n_features = 1  # hanya FF_X
+
+        # Transformasi ke supervised format
+        reframed = series_to_supervised(scaled, n_in=n_days, n_out=1)
         st.session_state['reframed'] = reframed
+        st.session_state['scaler'] = scaler
 
-        # 5. Splitting data
+        st.success(f"✅ Data berhasil diubah ke format supervised dengan {n_days} lag hari.")
+
+        # Tampilkan hasil reframing
+        st.subheader("📄 Contoh Data Supervised")
+        st.dataframe(reframed.head(10))
+
+        # Simpan hasil values untuk modeling
         values = reframed.values
+        st.write("🔢 Bentuk akhir array:", values.shape)
+        # --- Splitting Data Supervised ---
+        st.subheader("✂️ Pembagian Data Train dan Test")
+
+        # Membagi data tanpa shuffle
         train, test = train_test_split(values, test_size=0.2, shuffle=False)
 
-        # 6. Split input/output
+        # Ambil index asli dari df_musim sesuai reframed
+        date_reframed = df_train.index[reframed.index]
+        date_train = date_reframed[:len(train)]
+        date_test = date_reframed[len(train):]
+
+        # Tentukan dimensi input dan target
         n_obs = n_days * n_features
         train_X, train_y = train[:, :n_obs], train[:, -n_features:]
         test_X, test_y = test[:, :n_obs], test[:, -n_features:]
 
-        # 7. Reshape ke 3D (samples, timesteps, features)
+        # Reshape ke 3D untuk LSTM/TCN
         X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
         X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
         y_train = train_y
         y_test = test_y
 
-        # 8. Simpan ke session_state
-        st.session_state['df_train'] = df_musim.iloc[:len(train)]
-        st.session_state['df_test'] = df_musim.iloc[len(train):]
+        # Simpan ke session_state
         st.session_state['X_train'] = X_train
         st.session_state['X_test'] = X_test
         st.session_state['y_train'] = y_train
         st.session_state['y_test'] = y_test
+        st.session_state['date_train'] = date_train
+        st.session_state['date_test'] = date_test
 
-        # 9. Tampilkan info
-        st.subheader("📈 Informasi Data")
-        st.write(f"Jumlah total data: {len(df_musim)}")
-        st.write(f"Train set (input): {X_train.shape}, Test set (input): {X_test.shape}")
-        st.write(f"Train set (target): {y_train.shape}, Test set (target): {y_test.shape}")
+        # Tampilkan hasil
+        st.write("✅ Data berhasil dibagi ke bentuk input-output LSTM.")
 
-        # 10. Visualisasi FF_X Train/Test
-        st.subheader("🖼️ Visualisasi Pembagian Data Train dan Test")
-        fig, ax = plt.subplots(figsize=(22,6))
-        ax.plot(df_musim.index[:len(train)], df_musim['FF_X'].iloc[:len(train)], label='Training', color='blue')
-        ax.plot(df_musim.index[len(train):], df_musim['FF_X'].iloc[len(train):], label='Testing', color='orange')
-        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X')
-        ax.legend(loc='upper right')
-        st.pyplot(fig)
+        st.markdown("**🧾 Ringkasan Dimensi Data:**")
+        st.write("Total features:", n_features)
+        st.write("X_train:", X_train.shape)
+        st.write("X_test:", X_test.shape)
+        st.write("y_train:", y_train.shape)
+        st.write("y_test:", y_test.shape)
 
-        # 11. Tampilkan contoh normalisasi dan struktur input
-        st.subheader("🔍 Contoh Hasil Normalisasi")
-        st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
+        # Visualisasi struktur data
+        st.subheader("🔍 Contoh Data Input dan Output")
 
-        st.subheader("🧪 Contoh Struktur Input dan Target")
-        st.write("Contoh X_train[0]:", X_train[0])
-        st.write("Contoh y_train[0]:", y_train[0])
+        with st.expander("📌 Contoh struktur input X_train[0]"):
+            st.write(X_train[0])
 
-        # 12. Status
-        st.success("✅ Data berhasil dinormalisasi, ditransformasi (lagging), dan dibagi train/test!")
+        with st.expander("📌 Contoh target y_train[0]"):
+            st.write(y_train[0])
 
+        # Info tanggal
+        st.subheader("🗓️ Tanggal Data Train dan Test")
+        st.write("Tanggal train:", date_train.min(), "→", date_train.max())
+        st.write("Tanggal test:", date_test.min(), "→", date_test.max())
     
 if menu == "Hyperparameter Tuning (LSTM)":
     st.title("🎯 Hyperparameter Tuning dengan Optuna (LSTM)")
