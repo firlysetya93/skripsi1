@@ -512,7 +512,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                     st.plotly_chart(fig, use_container_width=True)
 
     # Panggil fungsi visualisasi
-    plot_feature_predictions(df_train, df_test, predictions_df, features)
+            plot_feature_predictions(df_train, df_test, predictions_df, features)
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
