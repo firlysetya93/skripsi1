@@ -275,6 +275,9 @@ if menu == "Transformasi Supervised & Splitting":
         # --- Splitting Data Supervised ---
         st.subheader("✂️ Pembagian Data Train dan Test")
 
+        # Membagi data tanpa shuffle
+        train, test = train_test_split(values, test_size=0.2, shuffle=False)
+
         # Ambil index asli dari df_musim sesuai reframed
         date_reframed = df_train.index[reframed.index]
         date_train = date_reframed[:len(train)]
