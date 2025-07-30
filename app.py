@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
-menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data", "Transformasi Supervised & Splitting", "Hyperparameter Tuning (LSTM)"])
+menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data", "Transformasi Supervised & Splitting", "Hyperparameter Tuning (LSTM)", "Evaluasi Model"])
 
 # === Menu 1: Preprocessing & Analisis Musim ===
 if menu == "Preprocessing & Analisis Musim":
@@ -439,6 +439,8 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 y_pred = tuned_model.predict(X_test)
                 y_test_inverse = scaler.inverse_transform(y_test)
                 y_pred_inverse = scaler.inverse_transform(y_pred)
+                st.session_state['y_test_inverse'] = y_test_inverse
+                st.session_state['y_pred_inverse'] = y_pred_inverse
 
                 fig2, ax2 = plt.subplots(figsize=(20, 8))
                 ax2.plot(y_test_inverse[:, 0], label='Aktual')
@@ -487,24 +489,153 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
-                def plot_feature_predictions(df_train, df_test, predictions_df, features):
-                    for feature in features:
-                        trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
-                                                 mode='lines', name='Training Data',
-                                                 line=dict(color='blue'))
-                        trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
-                                                mode='lines', name='Test Data',
-                                                line=dict(color='green'))
-                        trace_pred = go.Scatter(x=predictions_df.index,
-                                                y=predictions_df[f'{feature}_pred'],
-                                                mode='lines', name='Predicted Data',
-                                                line=dict(color='red'))
-                
-                        layout = go.Layout(title=f'{feature} - Training vs Test vs Predicted',
-                                           xaxis=dict(title='Tanggal'),
-                                           yaxis=dict(title='Value'),
-                                           legend=dict(x=0.1, y=1.1, orientation='h'),
-                                           plot_bgcolor='rgba(0,0,0,0)')
-                
-                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
-                        st.plotly_chart(fig, use_container_width=True)
+            def plot_feature_predictions(df_train, df_test, predictions_df, features):
+                for feature in features:
+                    trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
+                                             mode='lines', name='Training Data',
+                                             line=dict(color='blue'))
+                    trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
+                                            mode='lines', name='Test Data',
+                                            line=dict(color='green'))
+                    trace_pred = go.Scatter(x=predictions_df.index,
+                                            y=predictions_df[f'{feature}_pred'],
+                                            mode='lines', name='Predicted Data',
+                                            line=dict(color='red'))
+        
+                    layout = go.Layout(title=f'{feature} — Training, Test, and Prediction',
+                                       xaxis=dict(title='Tanggal'),
+                                       yaxis=dict(title='Nilai'),
+                                       legend=dict(x=0.1, y=1.1, orientation='h'),
+                                       plot_bgcolor='rgba(0,0,0,0)')
+        
+                    fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
+                    st.plotly_chart(fig, use_container_width=True)
+
+    # Panggil fungsi visualisasi
+    plot_feature_predictions(df_train, df_test, predictions_df, features)
+if menu == "Evaluasi Model":
+    st.title("📊 Evaluasi & Peramalan Model LSTM")
+
+    # ====== SIMPAN MODEL ======
+    if 'tuned_model' not in st.session_state:
+        st.warning("❗ Model belum tersedia. Silakan latih model terlebih dahulu.")
+    else:
+        tuned_model = st.session_state['tuned_model']
+
+        st.subheader("💾 Simpan Model")
+        if st.button("💾 Simpan Model LSTM ke .h5"):
+            model_filename = "lstm_model.h5"
+            tuned_model.save(model_filename)
+            st.success(f"Model berhasil disimpan sebagai `{model_filename}`")
+
+            with open(model_filename, "rb") as f:
+                st.download_button(
+                    label="⬇️ Unduh Model H5",
+                    data=f,
+                    file_name=model_filename,
+                    mime="application/octet-stream"
+                )
+
+    # ====== MUAT MODEL ======
+    st.subheader("📤 Muat Model dari File")
+    uploaded_model_file = st.file_uploader("🧾 Upload file model .h5", type=['h5'])
+
+    if uploaded_model_file is not None:
+        from tensorflow.keras.models import load_model
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_file:
+            tmp_file.write(uploaded_model_file.read())
+            tmp_path = tmp_file.name
+
+        try:
+            loaded_model = load_model(tmp_path)
+            st.session_state['loaded_model'] = loaded_model
+            st.success("✅ Model berhasil dimuat!")
+            with st.expander("📃 Struktur Model"):
+                stringlist = []
+                loaded_model.summary(print_fn=lambda x: stringlist.append(x))
+                st.text("\n".join(stringlist))
+        except Exception as e:
+            st.error(f"Gagal memuat model: {e}")
+            st.stop()
+
+    # ====== PERAMALAN ======
+    if 'loaded_model' in st.session_state:
+        st.subheader("📈 Peramalan Kecepatan Angin (FF_X)")
+
+        model = st.session_state['loaded_model']
+        df_musim_ = df_musim.copy()
+        features = ['FF_X']
+        n_forecast_days = st.number_input("🔮 Jumlah Hari Peramalan", min_value=1, max_value=60, value=30)
+
+        # Scaling
+        test_data = df_musim_[['FF_X']].astype('float32')
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        test_data_scaled = scaler.fit_transform(test_data)
+
+        # Ambil konfigurasi
+        n_days = st.session_state.get("n_days", 6)
+        n_features = 1
+
+        supervised = series_to_supervised(test_data_scaled, n_days, 1)
+        input_sequences = supervised.values[:, :n_days * n_features]
+
+        # Prediksi
+        forecast = []
+        for i in range(n_forecast_days):
+            if i >= len(input_sequences):
+                break
+            seq = input_sequences[i].reshape((1, n_days, n_features))
+            predicted = model.predict(seq, verbose=0)
+            forecast.append(predicted[0])
+
+        forecast_array = np.array(forecast)
+        forecast_inverse = np.abs(scaler.inverse_transform(forecast_array))
+        forecast_index = pd.date_range(start=df_musim_.index[-1], periods=n_forecast_days+1)[1:]
+        forecast_df = pd.DataFrame(forecast_inverse, index=forecast_index, columns=['FF_X'])
+
+        st.subheader("📊 Tabel Hasil Peramalan")
+        st.dataframe(forecast_df.head())
+
+        # Plotting
+        st.subheader("📉 Grafik Peramalan")
+        from plotly.subplots import make_subplots
+        import plotly.graph_objects as go
+
+        for feature in features:
+            fig = make_subplots(rows=1, cols=1, shared_xaxes=True)
+
+            fig.add_trace(go.Scatter(x=df_train.index, y=df_train[feature],
+                                     mode='lines', name='Data Training',
+                                     line=dict(color='green')), row=1, col=1)
+
+            fig.add_trace(go.Scatter(x=df_test.index, y=df_test[feature],
+                                     mode='lines', name='Data Test',
+                                     line=dict(color='orange')), row=1, col=1)
+
+            fig.add_trace(go.Scatter(x=forecast_df.index, y=forecast_df[feature],
+                                     mode='lines', name='Hasil Peramalan',
+                                     line=dict(color='blue')), row=1, col=1)
+
+            if not df_train.empty and not df_test.empty:
+                fig.add_trace(go.Scatter(x=[df_train.index[-1], df_test.index[0]],
+                                         y=[df_train[feature].iloc[-1], df_test[feature].iloc[0]],
+                                         mode='lines', line=dict(color='orange'), showlegend=False),
+                              row=1, col=1)
+
+            if not df_test.empty and not forecast_df.empty:
+                fig.add_trace(go.Scatter(x=[df_test.index[-1], forecast_df.index[0]],
+                                         y=[df_test[feature].iloc[-1], forecast_df[feature].iloc[0]],
+                                         mode='lines', line=dict(color='blue'), showlegend=False),
+                              row=1, col=1)
+
+            fig.update_layout(
+                title=f"Peramalan {feature} untuk {n_forecast_days} Hari ke Depan",
+                yaxis_title=feature,
+                legend=dict(x=0, y=1.1, orientation='h'),
+                height=450,
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
