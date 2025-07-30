@@ -157,26 +157,6 @@ if menu == "Preprocessing & Analisis Musim":
                     axes[2].set_ylabel("Kecepatan Angin (FF_X)")
         
                     st.pyplot(fig)
-                        # Train-test split
-                    df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
-                    st.session_state.df_train = df_train
-                    st.session_state.df_test = df_test
-                
-                    st.subheader("📂 Informasi Dataset")
-                    st.write(f"Jumlah data total: {df_musim.shape[0]}")
-                    st.write(f"Jumlah data train: {df_train.shape[0]}")
-                    st.write(f"Jumlah data test: {df_test.shape[0]}")
-                
-                    # Plot
-                    st.subheader("📈 Visualisasi Pembagian Data Train dan Test")
-                    fig, ax = plt.subplots(figsize=(16, 5))
-                    ax.plot(df_train.index, df_train['FF_X'], label='Training', color='blue')
-                    ax.plot(df_test.index, df_test['FF_X'], label='Testing', color='orange')
-                    ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X')
-                    ax.set_xlabel('Tanggal')
-                    ax.set_ylabel('FF_X')
-                    ax.legend(loc='upper right')
-                    st.pyplot(fig)
                 st.success("✅ Preprocessing dan analisis musiman selesai! Data siap digunakan di menu berikutnya.")
             except Exception as e:
                 st.error(f"❌ Terjadi kesalahan saat memproses tanggal: {e}")
@@ -194,102 +174,127 @@ if menu == "Normalisasi dan Splitting Data":
         st.stop()
     else:
         df_musim = st.session_state['df_musim'].copy()
+    # 3. Normalisasi kolom FF_X
         values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled = scaler.fit_transform(values)
         df_musim['FF_X_scaled'] = scaled
     
+        # 4. Simpan hasil normalisasi (scaler dan df) ke session_state
+        st.session_state['scaler'] = scaler
+        st.session_state['df_musim_scaled'] = df_musim
+    
+        # 5. Split data 80% train - 20% test, tanpa shuffle
+        df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
+    
+        # 6. Simpan hasil split ke session_state
+        st.session_state['df_train'] = df_train
+        st.session_state['df_test'] = df_test
+            
+        # 7. Tampilkan info data
+        st.subheader("📈 Informasi Data")
+        st.write(f"Jumlah total data: {len(df_musim)}")
+        st.write(f"Train set: {df_train.shape}, Test set: {df_test.shape}")
+    
+        # 8. Visualisasi pembagian data
+        st.subheader("🖼️ Visualisasi Pembagian Data Train dan Test")
+        fig, ax = plt.subplots(figsize=(22,6))
+        ax.plot(df_train.index, df_train['FF_X'], label='Training', color='blue')
+        ax.plot(df_test.index, df_test['FF_X'], label='Testing', color='orange')
+        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X')
+        ax.legend(loc='upper right')
+        st.pyplot(fig)
+    
+        # 9. Tampilkan hasil normalisasi
+        st.subheader("🔍 Contoh Hasil Normalisasi")
         st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
-        st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
+    
+        # 10. Status
+        st.success("✅ Data telah dinormalisasi, dibagi menjadi train-test, dan disimpan.")
     
         # --- 2. Transformasi ke Supervised Learning ---
     st.subheader("🔁 Transformasi ke Supervised Learning")
 
-    def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
-        df = pd.DataFrame(data)
-        n_vars = df.shape[1]
-        cols, names = [], []
+        def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
+            df = pd.DataFrame(data)
+            n_vars = df.shape[1]
+            cols, names = [], []
 
-        # input sequence (t-n, ... t-1)
-        for i in range(n_in, 0, -1):
-            cols.append(df.shift(i))
-            names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
+            # input sequence (t-n, ... t-1)
+            for i in range(n_in, 0, -1):
+                cols.append(df.shift(i))
+                names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
 
-        # output sequence (t, t+1, ..., t+n)
-        for i in range(0, n_out):
-            cols.append(df.shift(-i))
-            if i == 0:
-                names += [f'var{j+1}(t)' for j in range(n_vars)]
-            else:
-                names += [f'var{j+1}(t+{i})' for j in range(n_vars)]
+            # forecast sequence (t, t+1, ..., t+n)
+            for i in range(0, n_out):
+                cols.append(df.shift(-i))
+                if i == 0:
+                    names += [f'var{j+1}(t)' for j in range(n_vars)]
+                else:
+                    names += [f'var{j+1}(t+{i})' for j in range(n_vars)]
 
-        agg = pd.concat(cols, axis=1)
-        agg.columns = names
-        if dropnan:
-            agg.dropna(inplace=True)
-        return agg
+            agg = pd.concat(cols, axis=1)
+            agg.columns = names
+            if dropnan:
+                agg.dropna(inplace=True)
+            return agg
 
-    n_days = st.slider("Pilih jumlah lag (n_days):", min_value=1, max_value=30, value=6)
-    n_features = 1
+        # 4. Parameter lag
+        n_days = st.number_input("⏳ Jumlah Lag (n_days)", min_value=1, max_value=60, value=6)
+        n_features = 1  # hanya FF_X_scaled
 
-    reframed = series_to_supervised(scaled, n_days, 1)
-    st.write("✅ Data setelah transformasi:")
-    st.dataframe(reframed.head())
+        reframed = series_to_supervised(scaled, n_days, 1)
+        st.session_state['reframed'] = reframed
 
-    # --- 3. Splitting Data Train/Test ---
-    st.subheader("✂️ Splitting Data (Tanpa Shuffle, Rasio 80/20)")
+        # 5. Splitting data
+        values = reframed.values
+        train, test = train_test_split(values, test_size=0.2, shuffle=False)
 
-    values = reframed.values
-    date_reframed = df_musim.index[reframed.index]
+        # 6. Split input/output
+        n_obs = n_days * n_features
+        train_X, train_y = train[:, :n_obs], train[:, -n_features:]
+        test_X, test_y = test[:, :n_obs], test[:, -n_features:]
 
-    train_size = int(len(values) * 0.8)
-    train, test = values[:train_size], values[train_size:]
-    date_train = date_reframed[:len(train)]
-    date_test = date_reframed[len(train):]
+        # 7. Reshape ke 3D (samples, timesteps, features)
+        X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
+        X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
+        y_train = train_y
+        y_test = test_y
 
-    st.write(f"📦 Jumlah data total: {len(values)}")
-    st.write(f"🟦 Train: {len(train)} | Tanggal: {date_train.min()} → {date_train.max()}")
-    st.write(f"🟧 Test: {len(test)} | Tanggal: {date_test.min()} → {date_test.max()}")
+        # 8. Simpan ke session_state
+        st.session_state['df_train'] = df_musim.iloc[:len(train)]
+        st.session_state['df_test'] = df_musim.iloc[len(train):]
+        st.session_state['X_train'] = X_train
+        st.session_state['X_test'] = X_test
+        st.session_state['y_train'] = y_train
+        st.session_state['y_test'] = y_test
 
-    # Visualisasi
-    fig, ax = plt.subplots(figsize=(20, 5))
-    ax.plot(date_train, train[:, -1], label='Train', color='blue')
-    ax.plot(date_test, test[:, -1], label='Test', color='orange')
-    ax.set_title('📈 Visualisasi Pembagian Data Train/Test')
-    ax.legend()
-    st.pyplot(fig)
+        # 9. Tampilkan info
+        st.subheader("📈 Informasi Data")
+        st.write(f"Jumlah total data: {len(df_musim)}")
+        st.write(f"Train set (input): {X_train.shape}, Test set (input): {X_test.shape}")
+        st.write(f"Train set (target): {y_train.shape}, Test set (target): {y_test.shape}")
 
-    # --- 4. Reshape ke Format LSTM ---
-    st.subheader("📐 Reshape Data untuk Model LSTM")
+        # 10. Visualisasi FF_X Train/Test
+        st.subheader("🖼️ Visualisasi Pembagian Data Train dan Test")
+        fig, ax = plt.subplots(figsize=(22,6))
+        ax.plot(df_musim.index[:len(train)], df_musim['FF_X'].iloc[:len(train)], label='Training', color='blue')
+        ax.plot(df_musim.index[len(train):], df_musim['FF_X'].iloc[len(train):], label='Testing', color='orange')
+        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X')
+        ax.legend(loc='upper right')
+        st.pyplot(fig)
 
-    n_obs = n_days * n_features
-    train_X, train_y = train[:, :n_obs], train[:, -1]
-    test_X, test_y = test[:, :n_obs], test[:, -1]
+        # 11. Tampilkan contoh normalisasi dan struktur input
+        st.subheader("🔍 Contoh Hasil Normalisasi")
+        st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
 
-    X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
-    X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
-    y_train = train_y.reshape(-1, 1)
-    y_test = test_y.reshape(-1, 1)
+        st.subheader("🧪 Contoh Struktur Input dan Target")
+        st.write("Contoh X_train[0]:", X_train[0])
+        st.write("Contoh y_train[0]:", y_train[0])
 
-    st.write(f"✅ X_train shape: {X_train.shape}")
-    st.write(f"✅ y_train shape: {y_train.shape}")
-    st.write(f"✅ X_test shape: {X_test.shape}")
-    st.write(f"✅ y_test shape: {y_test.shape}")
+        # 12. Status
+        st.success("✅ Data berhasil dinormalisasi, ditransformasi (lagging), dan dibagi train/test!")
 
-    st.code(f"""
-Struktur input LSTM (X_train[0]):
-{X_train[0].flatten()}
-Target prediksi (y_train[0]): {y_train[0][0]}
-    """)
-
-    # --- Simpan ke session_state untuk digunakan di menu selanjutnya ---
-    st.session_state.scaler = scaler
-    st.session_state.reframed = reframed
-    st.session_state.X_train = X_train
-    st.session_state.y_train = y_train
-    st.session_state.X_test = X_test
-    st.session_state.y_test = y_test
-    st.session_state.n_features = n_features
     
 if menu == "Hyperparameter Tuning (LSTM)":
     st.title("🎯 Hyperparameter Tuning dengan Optuna (LSTM)")
