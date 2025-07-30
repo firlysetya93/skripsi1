@@ -252,6 +252,11 @@ if menu == "Transformasi Supervised & Splitting":
         # Set parameter input (lagging)
         n_days = st.slider("⏳ Jumlah Hari Input (Lag)", min_value=1, max_value=30, value=6)
         n_features = 1  # hanya FF_X
+        n_features = st.session_state.get("n_features", 1)
+
+        # Simpan nilai ke session_state untuk digunakan di bagian lain
+        st.session_state['n_days'] = n_days
+        st.session_state['n_features'] = n_features
 
         # Transformasi ke supervised format
         reframed = series_to_supervised(scaled, n_in=n_days, n_out=1)
