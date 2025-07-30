@@ -177,6 +177,16 @@ if menu == "Normalisasi dan Splitting Data":
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled = scaler.fit_transform(values)
         df_musim['FF_X_scaled'] = scaled
+        df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
+
+        st.write("✅ Data berhasil dibagi:")
+        st.write(f"📘 Data Train: {df_train.shape}")
+        st.write(f"📙 Data Test: {df_test.shape}")
+        
+        # Simpan ke session state
+        st.session_state['df_train'] = df_train
+        st.session_state['df_test'] = df_test
+        st.session_state['scaler'] = scaler
     
         st.dataframe(df_musim[['FF_X', 'FF_X_scaled']].head())
         st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
@@ -282,6 +292,12 @@ if menu == "Hyperparameter Tuning (LSTM)":
         y_test = st.session_state.y_test
         n_features = st.session_state.n_features
         scaler = st.session_state.scaler
+        
+        df_train = st.session_state.df_train
+        df_test = st.session_state.df_test
+        features = st.session_state.features  # ['FF_X', ...] — untuk plotting
+
+        feature_name = 'FF_X'  # Target utama
     
         n_trials = st.number_input("🔁 Jumlah Percobaan (Trials)", min_value=10, max_value=100, value=50, step=10)
     
@@ -431,6 +447,32 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
+                
+                # Plotly visualisasi
+                st.subheader("📈 Visualisasi Data Training, Test, dan Prediksi (Plotly)")
+
+                def plot_feature_predictions(df_train, df_test, predictions_df, features):
+                    for feature in features:
+                        trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
+                                                 mode='lines', name='Training Data',
+                                                 line=dict(color='blue'))
+                        trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
+                                                mode='lines', name='Test Data',
+                                                line=dict(color='green'))
+                        trace_pred = go.Scatter(x=predictions_df.index, y=predictions_df[f'{feature}_pred'],
+                                                mode='lines', name='Predicted Data',
+                                                line=dict(color='red'))
+
+                        layout = go.Layout(title=f'{feature} - Training, Test, and Prediction',
+                                           xaxis=dict(title='Tanggal'),
+                                           yaxis=dict(title='Value'),
+                                           legend=dict(x=0.1, y=1.1, orientation='h'),
+                                           plot_bgcolor='rgba(0,0,0,0)')
+
+                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
+                        st.plotly_chart(fig, use_container_width=True)
+
+                plot_feature_predictions(df_train, df_test, df_prediksi, [feature_name])
 
 
                 
