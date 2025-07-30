@@ -24,12 +24,20 @@ if menu == "Preprocessing & Analisis Musim":
     st.title("📊 Analisis Kecepatan Angin")
 
     uploaded_file = st.file_uploader("Unggah file Excel", type=['xlsx'])
-
     if uploaded_file is not None:
+        # Baca dan proses file hanya sekali
         df = pd.read_excel(uploaded_file)
+        df['TANGGAL'] = pd.to_datetime(df['TANGGAL'])
+        df.set_index('TANGGAL', inplace=True)
+    
+        # Inisialisasi session_state.features jika belum ada
+        if 'features' not in st.session_state:
+            st.session_state.features = ['FF_X']
+    
+        # Tampilkan preview dan missing values
         st.subheader("📊 Preview Data (5 Baris Pertama)")
         st.dataframe(df.head())
-
+    
         st.subheader("🧩 Jumlah Missing Values per Kolom")
         missing_values = df.isnull().sum()
         st.dataframe(missing_values[missing_values > 0])
