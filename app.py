@@ -12,6 +12,8 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import plotly.graph_objects as go
+
 
 
 
@@ -156,9 +158,15 @@ if menu == "Preprocessing & Analisis Musim":
                     axes[2].set_ylabel("Kecepatan Angin (FF_X)")
         
                     st.pyplot(fig)
-                        # Train-test split
+                if 'df_train' not in st.session_state or 'df_test' not in st.session_state or st.session_state.get("musim_terakhir") != selected_musim:
                     df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
-                
+                    st.session_state.df_train = df_train
+                    st.session_state.df_test = df_test
+                    st.session_state.musim_terakhir = selected_musim
+                else:
+                    df_train = st.session_state.df_train
+                    df_test = st.session_state.df_test
+
                     st.subheader("📂 Informasi Dataset")
                     st.write(f"Jumlah data total: {df_musim.shape[0]}")
                     st.write(f"Jumlah data train: {df_train.shape[0]}")
@@ -449,3 +457,56 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
+                # Fungsi untuk membuat plot interaktif per fitur
+
+                # ================= Fungsi Visualisasi =================
+                def plot_feature_predictions(df_train, df_test, predictions_df, features):
+                    for feature in features:
+                        trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
+                                                 mode='lines', name='Training Data',
+                                                 line=dict(color='blue'))
+                        trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
+                                                mode='lines', name='Test Data',
+                                                line=dict(color='green'))
+                        trace_pred = go.Scatter(x=predictions_df.index,
+                                                y=predictions_df[f'{feature}_pred'],
+                                                mode='lines', name='Predicted Data',
+                                                line=dict(color='red'))
+                
+                        layout = go.Layout(title=f'{feature} - Training vs Test vs Predicted',
+                                           xaxis=dict(title='Tanggal'),
+                                           yaxis=dict(title='Value'),
+                                           legend=dict(x=0.1, y=1.1, orientation='h'),
+                                           plot_bgcolor='rgba(0,0,0,0)')
+                
+                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # ================= Streamlit App =================
+                st.title("📊 Evaluasi dan Visualisasi Hasil Prediksi")
+                
+                # Validasi data tersedia
+                if 'df_train' in st.session_state and 'df_test' in st.session_state and 'predictions_df' in st.session_state and \
+                   'y_test_inverse' in st.session_state and 'y_pred_inverse' in st.session_state and 'features' in st.session_state:
+                
+                    df_train = st.session_state.df_train
+                    df_test = st.session_state.df_test
+                    predictions_df = st.session_state.predictions_df
+                    y_test_inverse = st.session_state.y_test_inverse
+                    y_pred_inverse = st.session_state.y_pred_inverse
+                    features = st.session_state.features
+                
+                    # Pastikan index predictions sesuai dengan df_test
+                    predictions_df.index = df_test.index[:predictions_df.shape[0]]
+                
+                    # ======= Tampilkan Metrik =======
+                    st.subheader("📌 Metrik Evaluasi Model")
+                    df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name=features[0])
+                    st.dataframe(df_metrics)
+                
+                    # ======= Tampilkan Plot =======
+                    st.subheader("📈 Visualisasi Hasil Prediksi Per Fitur")
+                    plot_feature_predictions(df_train, df_test, predictions_df, features)
+                
+                else:
+                    st.warning("🔔 Pastikan semua komponen (df_train, df_test, predictions_df, y_test_inverse, y_pred_inverse, features) tersedia di session_state.")
