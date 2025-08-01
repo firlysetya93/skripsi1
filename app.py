@@ -481,15 +481,12 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 def plot_feature_predictions(df_train, df_test, predictions_df, features):
                     for feature in features:
                         trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
-                                                 mode='lines', name='Training Data',
-                                                 line=dict(color='blue'))
+                                                 mode='lines', name='Training Data', line=dict(color='blue'))
                         trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
-                                                mode='lines', name='Test Data',
-                                                line=dict(color='green'))
+                                                mode='lines', name='Test Data', line=dict(color='green'))
                         trace_pred = go.Scatter(x=predictions_df.index,
                                                 y=predictions_df[f'{feature}_pred'],
-                                                mode='lines', name='Predicted Data',
-                                                line=dict(color='red'))
+                                                mode='lines', name='Predicted Data', line=dict(color='red'))
             
                         layout = go.Layout(title=f'{feature} — Training, Test, and Prediction',
                                            xaxis=dict(title='Tanggal'),
@@ -499,9 +496,10 @@ if menu == "Hyperparameter Tuning (LSTM)":
             
                         fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
                         st.plotly_chart(fig, use_container_width=True)
-    
-        # Panggil fungsi visualisasi
-                    plot_feature_predictions(df_train, df_test, predictions_df, features)
+            
+                # Panggil fungsi visualisasi
+                features = ['FF_X']
+                plot_feature_predictions(df_train, df_test, df_prediksi, features)
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
