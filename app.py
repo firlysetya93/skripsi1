@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 
 # === Sidebar menu ===
 st.sidebar.title("📂 Menu")
-menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Normalisasi dan Splitting Data", "Transformasi Supervised & Splitting", "Hyperparameter Tuning (LSTM)", "Evaluasi Model"])
+menu = st.sidebar.selectbox("Pilih Halaman", ["Preprocessing & Analisis Musim", "Transformasi Supervised & Splitting", "Hyperparameter Tuning (LSTM)", "Evaluasi Model"])
 
 # === Menu 1: Preprocessing & Analisis Musim ===
 if menu == "Preprocessing & Analisis Musim":
@@ -164,17 +164,16 @@ if menu == "Preprocessing & Analisis Musim":
             st.warning("⚠️ Kolom 'TANGGAL' tidak ditemukan dalam dataset.")
     else:
         st.info("⬆️ Silakan upload file Excel (.xlsx) terlebih dahulu.")
-        
-# === Menu 2: Normalisasi dan Splitting Data ===
-if menu == "Normalisasi dan Splitting Data":
-    st.title("📏 Normalisasi dan Splitting Data")
+    
+# === Menu 4: Transformasi Supervised & Splitting ===
+if menu == "Transformasi Supervised & Splitting":
+    st.title("🔁 Transformasi Supervised Learning")
 
-    if "df_musim" not in st.session_state:
-        st.warning("❗ Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu di menu sebelumnya.")
+    if "df_train" not in st.session_state:
+        st.warning("❗ Data train belum tersedia. Silakan lakukan Normalisasi dan Splitting terlebih dahulu.")
         st.stop()
     else:
-        df_musim = st.session_state['df_musim'].copy()
-
+        df_train = st.session_state['df_train'].copy()
         # Normalisasi kolom FF_X
         values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
         scaler = MinMaxScaler(feature_range=(0, 1))
@@ -208,16 +207,6 @@ if menu == "Normalisasi dan Splitting Data":
         ax.legend(loc='upper right')
         st.pyplot(fig)
         st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
-    
-# === Menu 4: Transformasi Supervised & Splitting ===
-if menu == "Transformasi Supervised & Splitting":
-    st.title("🔁 Transformasi Supervised Learning")
-
-    if "df_train" not in st.session_state:
-        st.warning("❗ Data train belum tersedia. Silakan lakukan Normalisasi dan Splitting terlebih dahulu.")
-        st.stop()
-    else:
-        df_train = st.session_state['df_train'].copy()
 
         # Fungsi untuk transformasi supervised
         def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
@@ -512,7 +501,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                         st.plotly_chart(fig, use_container_width=True)
     
         # Panggil fungsi visualisasi
-                plot_feature_predictions(df_train, df_test, predictions_df, features)
+                    plot_feature_predictions(df_train, df_test, predictions_df, features)
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
