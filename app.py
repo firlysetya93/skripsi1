@@ -489,30 +489,30 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
-            def plot_feature_predictions(df_train, df_test, predictions_df, features):
-                for feature in features:
-                    trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
-                                             mode='lines', name='Training Data',
-                                             line=dict(color='blue'))
-                    trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
-                                            mode='lines', name='Test Data',
-                                            line=dict(color='green'))
-                    trace_pred = go.Scatter(x=predictions_df.index,
-                                            y=predictions_df[f'{feature}_pred'],
-                                            mode='lines', name='Predicted Data',
-                                            line=dict(color='red'))
-        
-                    layout = go.Layout(title=f'{feature} — Training, Test, and Prediction',
-                                       xaxis=dict(title='Tanggal'),
-                                       yaxis=dict(title='Nilai'),
-                                       legend=dict(x=0.1, y=1.1, orientation='h'),
-                                       plot_bgcolor='rgba(0,0,0,0)')
-        
-                    fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
-                    st.plotly_chart(fig, use_container_width=True)
-
-    # Panggil fungsi visualisasi
-            plot_feature_predictions(df_train, df_test, predictions_df, features)
+                def plot_feature_predictions(df_train, df_test, predictions_df, features):
+                    for feature in features:
+                        trace_train = go.Scatter(x=df_train.index, y=df_train[feature],
+                                                 mode='lines', name='Training Data',
+                                                 line=dict(color='blue'))
+                        trace_test = go.Scatter(x=df_test.index, y=df_test[feature],
+                                                mode='lines', name='Test Data',
+                                                line=dict(color='green'))
+                        trace_pred = go.Scatter(x=predictions_df.index,
+                                                y=predictions_df[f'{feature}_pred'],
+                                                mode='lines', name='Predicted Data',
+                                                line=dict(color='red'))
+            
+                        layout = go.Layout(title=f'{feature} — Training, Test, and Prediction',
+                                           xaxis=dict(title='Tanggal'),
+                                           yaxis=dict(title='Nilai'),
+                                           legend=dict(x=0.1, y=1.1, orientation='h'),
+                                           plot_bgcolor='rgba(0,0,0,0)')
+            
+                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
+                        st.plotly_chart(fig, use_container_width=True)
+    
+        # Panggil fungsi visualisasi
+                plot_feature_predictions(df_train, df_test, predictions_df, features)
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
