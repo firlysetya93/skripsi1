@@ -13,6 +13,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 
@@ -308,7 +309,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
         df_train = st.session_state['df_train']
         df_test = st.session_state['df_test']
         predictions_df = st.session_state['predictions_df']
-    
+  
         n_trials = st.number_input("🔁 Jumlah Percobaan (Trials)", min_value=10, max_value=100, value=50, step=10)
     
         def objective(trial):
@@ -459,31 +460,50 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
-                # === Fungsi Plot Interaktif ===
                 def plot_feature_predictions_streamlit(df_train, df_test, predictions_df, features):
-                    st.subheader("📈 Visualisasi Data Training, Test, dan Prediksi")
+                    """
+                    Menampilkan plot data training, test, dan prediksi untuk setiap fitur di Streamlit.
                 
-                    selected_feature = st.selectbox("Pilih fitur untuk ditampilkan:", features)
+                    Parameters:
+                    - df_train: DataFrame data pelatihan
+                    - df_test: DataFrame data pengujian
+                    - predictions_df: DataFrame berisi hasil prediksi
+                    - features: List nama fitur yang ingin diprediksi
+                    """
+                    st.subheader("📊 Visualisasi Hasil Prediksi")
                 
-                    if selected_feature not in df_train.columns or f"{selected_feature}_pred" not in predictions_df.columns:
-                        st.warning(f"❗ Fitur {selected_feature} tidak ditemukan dalam data.")
-                        return
+                    for feature in features:
+                        st.markdown(f"### Fitur: `{feature}`")
                 
-                    trace_train = go.Scatter(x=df_train.index, y=df_train[selected_feature],
-                                             mode='lines', name='Training Data', line=dict(color='blue'))
-                    trace_test = go.Scatter(x=df_test.index, y=df_test[selected_feature],
-                                            mode='lines', name='Test Data', line=dict(color='green'))
-                    trace_pred = go.Scatter(x=predictions_df.index, y=predictions_df[f'{selected_feature}_pred'],
-                                            mode='lines', name='Predicted Data', line=dict(color='red'))
+                        # Buat trace Plotly
+                        trace_train = go.Scatter(
+                            x=df_train.index, y=df_train[feature],
+                            mode='lines', name='Data Training',
+                            line=dict(color='blue')
+                        )
+                        trace_test = go.Scatter(
+                            x=df_test.index, y=df_test[feature],
+                            mode='lines', name='Data Test',
+                            line=dict(color='green')
+                        )
+                        trace_pred = go.Scatter(
+                            x=predictions_df.index, y=predictions_df[f"{feature}_pred"],
+                            mode='lines', name='Data Prediksi',
+                            line=dict(color='red')
+                        )
                 
-                    layout = go.Layout(title=f'{selected_feature} - Training, Test, dan Prediksi',
-                                       xaxis=dict(title='Tanggal'),
-                                       yaxis=dict(title='Nilai'),
-                                       legend=dict(x=0.1, y=1.1, orientation='h'),
-                                       plot_bgcolor='rgba(0,0,0,0'))
+                        layout = go.Layout(
+                            title=f'{feature} - Training, Test, dan Prediksi',
+                            xaxis=dict(title='Tanggal'),
+                            yaxis=dict(title='Nilai'),
+                            legend=dict(x=0.1, y=1.1, orientation='h'),
+                            plot_bgcolor='rgba(0,0,0,0)'  # background transparan
+                        )
                 
-                    fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
-                    st.plotly_chart(fig, use_container_width=True)
+                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
+                
+                        # Tampilkan di Streamlit
+                        st.plotly_chart(fig, use_container_width=True)
             
                 # Panggil fungsi visualisasi
                 predictions_df.index = df_test.index[:predictions_df.shape[0]]
@@ -575,6 +595,7 @@ if menu == "Evaluasi Model":
 
         # Plotting
         st.subheader("📉 Grafik Peramalan")
+
         for feature in features:
             fig = make_subplots(rows=1, cols=1, shared_xaxes=True)
 
@@ -610,4 +631,3 @@ if menu == "Evaluasi Model":
                 plot_bgcolor='rgba(0,0,0,0)'
             )
             st.plotly_chart(fig, use_container_width=True)
-
