@@ -169,151 +169,129 @@ if menu == "Preprocessing & Analisis Musim":
 if menu == "Transformasi Supervised & Splitting":
     st.title("🔁 Transformasi Supervised Learning")
 
-    if "df_train" not in st.session_state:
-        st.warning("❗ Data train belum tersedia. Silakan lakukan Normalisasi dan Splitting terlebih dahulu.")
+    if "df_musim" not in st.session_state:
+        st.warning("❗ Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
         st.stop()
-    else:
-        df_train = st.session_state['df_train'].copy()
-        # Normalisasi kolom FF_X
-        values = df_musim['FF_X'].values.astype('float32').reshape(-1, 1)
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled = scaler.fit_transform(values)
-        df_musim['FF_X_scaled'] = scaled
+    
+    df_musim = st.session_state["df_musim"].copy()
 
-        # Simpan scaler ke session_state jika dibutuhkan nanti
-        st.session_state['scaler'] = scaler
+    # --- Normalisasi ---
+    st.subheader("📊 Normalisasi Data")
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaled_values = scaler.fit_transform(df_musim[['FF_X']].values.astype('float32'))
+    df_musim['FF_X_scaled'] = scaled_values
+    st.session_state['scaler'] = scaler
 
-        # Splitting tanpa shuffle: 80% train, 20% test
-        train_size = int(len(df_musim) * 0.8)
-        df_train = df_musim.iloc[:train_size]
-        df_test = df_musim.iloc[train_size:]
+    # --- Train-test split ---
+    st.subheader("✂️ Pembagian Data Train dan Test")
+    df_train, df_test = train_test_split(df_musim, test_size=0.2, shuffle=False)
+    st.session_state['df_train'] = df_train
+    st.session_state['df_test'] = df_test
 
-        # Simpan hasil splitting ke session_state
-        st.session_state['df_train'] = df_train
-        st.session_state['df_test'] = df_test
-
-        # Info ukuran data
-        st.subheader("📊 Ukuran Data")
-        st.write("Data Train:", df_train.shape)
-        st.write("Data Test:", df_test.shape)
-
-        # Visualisasi pembagian data
-        st.subheader("📈 Visualisasi Pembagian Data Train dan Test")
-
+    # --- Visualisasi ---
+    features = ['FF_X']
+    for feature in features:
         fig, ax = plt.subplots(figsize=(22, 6))
-        ax.plot(df_train.index, df_train['FF_X_scaled'], label='Training', color='blue')
-        ax.plot(df_test.index, df_test['FF_X_scaled'], label='Testing', color='orange')
-        ax.set_title('Pembagian Data Train dan Test pada Variabel FF_X_scaled')
-        ax.legend(loc='upper right')
+        ax.plot(df_train.index, df_train[feature], label='Training', color='blue')
+        ax.plot(df_test.index, df_test[feature], label='Testing', color='orange')
+        ax.set_title(f'Pembagian Data Train dan Test pada Variabel {feature}')
+        ax.legend()
         st.pyplot(fig)
-        st.success("✅ Data telah dinormalisasi dan siap untuk digunakan.")
 
-        # Fungsi untuk transformasi supervised
-        def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
-            df = pd.DataFrame(data)
-            n_vars = df.shape[1]
-            cols, names = [], []
+    st.success("✅ Data telah dinormalisasi dan dibagi menjadi train/test.")
+    # === Fungsi Transformasi Supervised ===
+    def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
+        df = pd.DataFrame(data)
+        n_vars = df.shape[1]
+        cols, names = [], []
 
-            # input sequence (t-n, ... t-1)
-            for i in range(n_in, 0, -1):
-                cols.append(df.shift(i))
-                names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
+        for i in range(n_in, 0, -1):
+            cols.append(df.shift(i))
+            names += [f'var{j+1}(t-{i})' for j in range(n_vars)]
 
-            # forecast sequence (t, t+1, ..., t+n)
-            for i in range(0, n_out):
-                cols.append(df.shift(-i))
-                if i == 0:
-                    names += [f'var{j+1}(t)' for j in range(n_vars)]
-                else:
-                    names += [f'var{j+1}(t+{i})' for j in range(n_vars)]
+        for i in range(0, n_out):
+            cols.append(df.shift(-i))
+            if i == 0:
+                names += [f'var{j+1}(t)' for j in range(n_vars)]
+            else:
+                names += [f'var{j+1}(t+{i})' for j in range(n_vars)]
 
-            agg = pd.concat(cols, axis=1)
-            agg.columns = names
+        agg = pd.concat(cols, axis=1)
+        agg.columns = names
 
-            if dropnan:
-                agg.dropna(inplace=True)
-            return agg
+        if dropnan:
+            agg.dropna(inplace=True)
+        return agg
 
-        # Skala FF_X dari df_train
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled = scaler.fit_transform(df_train[['FF_X']])
+    # === Normalisasi ulang FF_X jika belum disimpan ===
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaled = scaler.fit_transform(df_train[['FF_X']])
+    st.session_state['scaler'] = scaler
 
-        # Set parameter input (lagging)
-        n_days = st.slider("⏳ Jumlah Hari Input (Lag)", min_value=1, max_value=30, value=6)
-        n_features = 1  # hanya FF_X
-        n_features = st.session_state.get("n_features", 1)
+    # === Parameter Lag ===
+    n_days = st.slider("⏳ Jumlah Hari Input (Lag)", min_value=1, max_value=30, value=6)
+    n_features = st.session_state.get("n_features", 1)
 
-        # Simpan nilai ke session_state untuk digunakan di bagian lain
-        st.session_state['n_days'] = n_days
-        st.session_state['n_features'] = n_features
+    st.session_state['n_days'] = n_days
+    st.session_state['n_features'] = n_features
 
-        # Transformasi ke supervised format
-        reframed = series_to_supervised(scaled, n_in=n_days, n_out=1)
-        st.session_state['reframed'] = reframed
-        st.session_state['scaler'] = scaler
+    # === Transformasi ke Supervised Format ===
+    reframed = series_to_supervised(scaled, n_in=n_days, n_out=1)
+    st.session_state['reframed'] = reframed
 
-        st.success(f"✅ Data berhasil diubah ke format supervised dengan {n_days} lag hari.")
+    st.success(f"✅ Data berhasil diubah ke format supervised dengan {n_days} lag hari.")
+    st.subheader("📄 Contoh Data Supervised")
+    st.dataframe(reframed.head(10))
 
-        # Tampilkan hasil reframing
-        st.subheader("📄 Contoh Data Supervised")
-        st.dataframe(reframed.head(10))
+    # === Splitting Train-Test ===
+    st.subheader("✂️ Pembagian Data Train dan Test")
+    values = reframed.values
+    train, test = train_test_split(values, test_size=0.2, shuffle=False)
 
-        # Simpan hasil values untuk modeling
-        values = reframed.values
-        st.write("🔢 Bentuk akhir array:", values.shape)
-        # --- Splitting Data Supervised ---
-        st.subheader("✂️ Pembagian Data Train dan Test")
+    # Ambil indeks tanggal sesuai reframed
+    date_reframed = df_train.index[reframed.index]
+    date_train = date_reframed[:len(train)]
+    date_test = date_reframed[len(train):]
 
-        # Membagi data tanpa shuffle
-        train, test = train_test_split(values, test_size=0.2, shuffle=False)
+    n_obs = n_days * n_features
+    train_X, train_y = train[:, :n_obs], train[:, -n_features:]
+    test_X, test_y = test[:, :n_obs], test[:, -n_features:]
 
-        # Ambil index asli dari df_musim sesuai reframed
-        date_reframed = df_train.index[reframed.index]
-        date_train = date_reframed[:len(train)]
-        date_test = date_reframed[len(train):]
+    # Reshape ke 3D
+    X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
+    X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
 
-        # Tentukan dimensi input dan target
-        n_obs = n_days * n_features
-        train_X, train_y = train[:, :n_obs], train[:, -n_features:]
-        test_X, test_y = test[:, :n_obs], test[:, -n_features:]
+    # Simpan ke session state
+    st.session_state['X_train'] = X_train
+    st.session_state['X_test'] = X_test
+    st.session_state['y_train'] = train_y
+    st.session_state['y_test'] = test_y
+    st.session_state['date_train'] = date_train
+    st.session_state['date_test'] = date_test
 
-        # Reshape ke 3D untuk LSTM/TCN
-        X_train = train_X.reshape((train_X.shape[0], n_days, n_features))
-        X_test = test_X.reshape((test_X.shape[0], n_days, n_features))
-        y_train = train_y
-        y_test = test_y
+    st.success("✅ Data berhasil dibagi ke bentuk input-output LSTM.")
 
-        # Simpan ke session_state
-        st.session_state['X_train'] = X_train
-        st.session_state['X_test'] = X_test
-        st.session_state['y_train'] = y_train
-        st.session_state['y_test'] = y_test
-        st.session_state['date_train'] = date_train
-        st.session_state['date_test'] = date_test
+    # === Ringkasan Dimensi ===
+    st.markdown("**🧾 Ringkasan Dimensi Data:**")
+    st.write("Total features:", n_features)
+    st.write("X_train:", X_train.shape)
+    st.write("X_test:", X_test.shape)
+    st.write("y_train:", train_y.shape)
+    st.write("y_test:", test_y.shape)
 
-        # Tampilkan hasil
-        st.write("✅ Data berhasil dibagi ke bentuk input-output LSTM.")
+    # === Visualisasi Contoh Data ===
+    st.subheader("🔍 Contoh Data Input dan Output")
 
-        st.markdown("**🧾 Ringkasan Dimensi Data:**")
-        st.write("Total features:", n_features)
-        st.write("X_train:", X_train.shape)
-        st.write("X_test:", X_test.shape)
-        st.write("y_train:", y_train.shape)
-        st.write("y_test:", y_test.shape)
+    with st.expander("📌 Contoh struktur input X_train[0]"):
+        st.write(X_train[0])
 
-        # Visualisasi struktur data
-        st.subheader("🔍 Contoh Data Input dan Output")
+    with st.expander("📌 Contoh target y_train[0]"):
+        st.write(train_y[0])
 
-        with st.expander("📌 Contoh struktur input X_train[0]"):
-            st.write(X_train[0])
-
-        with st.expander("📌 Contoh target y_train[0]"):
-            st.write(y_train[0])
-
-        # Info tanggal
-        st.subheader("🗓️ Tanggal Data Train dan Test")
-        st.write("Tanggal train:", date_train.min(), "→", date_train.max())
-        st.write("Tanggal test:", date_test.min(), "→", date_test.max())
+    # === Tanggal Train-Test ===
+    st.subheader("🗓️ Tanggal Data Train dan Test")
+    st.write("Tanggal train:", date_train.min(), "→", date_train.max())
+    st.write("Tanggal test:", date_test.min(), "→", date_test.max())
     
 if menu == "Hyperparameter Tuning (LSTM)":
     st.title("🎯 Hyperparameter Tuning dengan Optuna (LSTM)")
