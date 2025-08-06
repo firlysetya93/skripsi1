@@ -308,7 +308,6 @@ if menu == "Hyperparameter Tuning (LSTM)":
         scaler = st.session_state.scaler
         df_train = st.session_state['df_train']
         df_test = st.session_state['df_test']
-        predictions_df = st.session_state['predictions_df']  
   
         n_trials = st.number_input("🔁 Jumlah Percobaan (Trials)", min_value=10, max_value=100, value=50, step=10)
     
@@ -460,69 +459,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 st.subheader("📌 Metrik Evaluasi Model")
                 df_metrics = calculate_metrics(y_test_inverse, y_pred_inverse, feature_name='FF_X')
                 st.dataframe(df_metrics)
-                def plot_feature_predictions_streamlit(df_train, df_test, predictions_df, features):
-                    """
-                    Menampilkan plot data training, test, dan prediksi untuk setiap fitur di Streamlit.
-                
-                    Parameters:
-                    - df_train: DataFrame data pelatihan
-                    - df_test: DataFrame data pengujian
-                    - predictions_df: DataFrame berisi hasil prediksi
-                    - features: List nama fitur yang ingin diprediksi
-                    """
-                    st.subheader("📊 Visualisasi Hasil Prediksi")
-    
-                    for feature in features:
-                        if feature not in df_train.columns or f"{feature}_pred" not in predictions_df.columns:
-                            st.warning(f"❗ Fitur `{feature}` atau hasil prediksinya tidak ditemukan.")
-                            continue
-                
-                        st.markdown(f"### Fitur: `{feature}`")
-
-                        # Buat trace Plotly
-                        trace_train = go.Scatter(
-                            x=df_train.index, y=df_train[feature],
-                            mode='lines', name='Data Training',
-                            line=dict(color='blue')
-                        )
-                        trace_test = go.Scatter(
-                            x=df_test.index, y=df_test[feature],
-                            mode='lines', name='Data Test',
-                            line=dict(color='green')
-                        )
-                        trace_pred = go.Scatter(
-                            x=predictions_df.index, y=predictions_df[f"{feature}_pred"],
-                            mode='lines', name='Data Prediksi',
-                            line=dict(color='red')
-                        )
-                
-                        layout = go.Layout(
-                            title=f'{feature} - Training, Test, dan Prediksi',
-                            xaxis=dict(title='Tanggal'),
-                            yaxis=dict(title='Nilai'),
-                            legend=dict(x=0.1, y=1.1, orientation='h'),
-                            plot_bgcolor='rgba(0,0,0,0)'  # background transparan
-                        )
-                
-                        fig = go.Figure(data=[trace_train, trace_test, trace_pred], layout=layout)
-                
-                        # Tampilkan di Streamlit
-                        st.plotly_chart(fig, use_container_width=True)
-                required_keys = ['df_train', 'df_test', 'predictions_df', 'features']
-                if all(k in st.session_state for k in required_keys):
-                    df_train = st.session_state['df_train']
-                    df_test = st.session_state['df_test']
-                    predictions_df = st.session_state['predictions_df']
-                    features = st.session_state['features']
-                
-                    # Samakan index prediksi dengan test jika belum
-                    predictions_df.index = df_test.index[:predictions_df.shape[0]]
-                
-                    # Panggil fungsi visualisasi
-                    plot_feature_predictions_streamlit(df_train, df_test, predictions_df, features)
-                else:
-                    st.warning("❗ Beberapa data belum tersedia di session_state. Pastikan proses prediksi sudah dijalankan.")
-            
+      
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
