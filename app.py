@@ -14,6 +14,8 @@ from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from tensorflow.keras.models import load_model
+import tempfile
 
 
 
@@ -487,9 +489,6 @@ if menu == "Evaluasi Model":
     uploaded_model_file = st.file_uploader("🧾 Upload file model .h5", type=['h5'])
 
     if uploaded_model_file is not None:
-        from tensorflow.keras.models import load_model
-        import tempfile
-
         with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_file:
             tmp_file.write(uploaded_model_file.read())
             tmp_path = tmp_file.name
@@ -510,8 +509,17 @@ if menu == "Evaluasi Model":
     if 'loaded_model' in st.session_state:
         st.subheader("📈 Peramalan Kecepatan Angin (FF_X)")
 
+        X_train = st.session_state['X_train']
+        y_train = st.session_state['y_train']
+        X_test = st.session_state['X_test']
+        y_test = st.session_state['y_test']
+        n_features = st.session_state['n_features']
+        scaler = st.session_state['scaler']
+        df_train = st.session_state['df_train']
+        df_test = st.session_state['df_test']
         model = st.session_state['loaded_model']
         df_musim_ = df_musim.copy()
+        df_musim = st.session_state['df_musim']
         features = ['FF_X']
         n_forecast_days = st.number_input("🔮 Jumlah Hari Peramalan", min_value=1, max_value=60, value=30)
 
