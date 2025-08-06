@@ -463,133 +463,144 @@ if menu == "Hyperparameter Tuning (LSTM)":
       
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
-
-    # ====== SIMPAN MODEL ======
-    if 'tuned_model' not in st.session_state:
-        st.warning("❗ Model belum tersedia. Silakan latih model terlebih dahulu.")
-    else:
-        tuned_model = st.session_state['tuned_model']
-
-        st.subheader("💾 Simpan Model")
-        if st.button("💾 Simpan Model LSTM ke .h5"):
-            model_filename = "lstm_model.h5"
-            tuned_model.save(model_filename)
-            st.success(f"Model berhasil disimpan sebagai `{model_filename}`")
-
-            with open(model_filename, "rb") as f:
-                st.download_button(
-                    label="⬇️ Unduh Model H5",
-                    data=f,
-                    file_name=model_filename,
-                    mime="application/octet-stream"
-                )
-
-    # ====== MUAT MODEL ======
-    st.subheader("📤 Muat Model dari File")
-    uploaded_model_file = st.file_uploader("🧾 Upload file model .h5", type=['h5'])
-
-    if uploaded_model_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_file:
-            tmp_file.write(uploaded_model_file.read())
-            tmp_path = tmp_file.name
-
-        try:
-            loaded_model = load_model(tmp_path)
-            st.session_state['loaded_model'] = loaded_model
-            st.success("✅ Model berhasil dimuat!")
-            with st.expander("📃 Struktur Model"):
-                stringlist = []
-                loaded_model.summary(print_fn=lambda x: stringlist.append(x))
-                st.text("\n".join(stringlist))
-        except Exception as e:
-            st.error(f"Gagal memuat model: {e}")
-            st.stop()
-
-    # ====== PERAMALAN ======
-    if 'loaded_model' in st.session_state:
-        st.subheader("📈 Peramalan Kecepatan Angin (FF_X)")
-        # Ambil semua dari session_state
-        X_train = st.session_state['X_train']
-        y_train = st.session_state['y_train']
-        X_test = st.session_state['X_test']
-        y_test = st.session_state['y_test']
-        n_features = st.session_state['n_features']
-        scaler = st.session_state['scaler']
-        df_train = st.session_state['df_train']
-        df_test = st.session_state['df_test']
-        model = st.session_state['loaded_model']
-        df_musim = st.session_state['df_musim']  # Ambil dulu
-        df_musim_ = df_musim.copy()  
-        # Scaling
-        test_data = df_musim_[['FF_X']].astype('float32')
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        test_data_scaled = scaler.fit_transform(test_data)
-
-        # Ambil konfigurasi
-        n_days = st.session_state.get("n_days", 6)
-        n_features = 1
-
-        supervised = series_to_supervised(test_data_scaled, n_days, 1)
-        input_sequences = supervised.values[:, :n_days * n_features]
-
-        # Prediksi
-        forecast = []
-        for i in range(n_forecast_days):
-            if i >= len(input_sequences):
-                break
-            seq = input_sequences[i].reshape((1, n_days, n_features))
-            predicted = model.predict(seq, verbose=0)
-            forecast.append(predicted[0])
-
-        forecast_array = np.array(forecast)
-        forecast_inverse = np.abs(scaler.inverse_transform(forecast_array))
-        forecast_index = pd.date_range(start=df_musim_.index[-1], periods=n_forecast_days+1)[1:]
-        forecast_df = pd.DataFrame(forecast_inverse, index=forecast_index, columns=['FF_X'])
-
-        st.subheader("📊 Tabel Hasil Peramalan")
-        st.dataframe(forecast_df.head())
-
-        # Plotting
-        st.subheader("📉 Grafik Peramalan")
-        if 'df_musim' not in st.session_state:
-            st.warning("❗ Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
-            st.stop()
-        else:
-            df_musim = st.session_state['df_musim']
-            df_musim_ = df_musim.copy()
-
-        for feature in features:
-            fig = make_subplots(rows=1, cols=1, shared_xaxes=True)
-
-            fig.add_trace(go.Scatter(x=df_train.index, y=df_train[feature],
-                                     mode='lines', name='Data Training',
-                                     line=dict(color='green')), row=1, col=1)
-
-            fig.add_trace(go.Scatter(x=df_test.index, y=df_test[feature],
-                                     mode='lines', name='Data Test',
-                                     line=dict(color='orange')), row=1, col=1)
-
-            fig.add_trace(go.Scatter(x=forecast_df.index, y=forecast_df[feature],
-                                     mode='lines', name='Hasil Peramalan',
-                                     line=dict(color='blue')), row=1, col=1)
-
-            if not df_train.empty and not df_test.empty:
-                fig.add_trace(go.Scatter(x=[df_train.index[-1], df_test.index[0]],
-                                         y=[df_train[feature].iloc[-1], df_test[feature].iloc[0]],
-                                         mode='lines', line=dict(color='orange'), showlegend=False),
-                              row=1, col=1)
-
-            if not df_test.empty and not forecast_df.empty:
-                fig.add_trace(go.Scatter(x=[df_test.index[-1], forecast_df.index[0]],
-                                         y=[df_test[feature].iloc[-1], forecast_df[feature].iloc[0]],
-                                         mode='lines', line=dict(color='blue'), showlegend=False),
-                              row=1, col=1)
-
-            fig.update_layout(
-                title=f"Peramalan {feature} untuk {n_forecast_days} Hari ke Depan",
-                yaxis_title=feature,
-                legend=dict(x=0, y=1.1, orientation='h'),
-                height=450,
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    # Fungsi untuk ubah ke supervised
+    def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
+        df = pd.DataFrame(data)
+        cols, names = [], []
+        for i in range(n_in, 0, -1):
+            cols.append(df.shift(i))
+            names += [f'var(t-{i})']
+        for i in range(n_out):
+            cols.append(df.shift(-i))
+            names += ['var(t)'] if i == 0 else [f'var(t+{i})']
+        agg = pd.concat(cols, axis=1)
+        agg.columns = names
+        if dropnan:
+            agg.dropna(inplace=True)
+        return agg
+    
+    # Judul
+    st.subheader("📦 Prediksi & Visualisasi Kecepatan Angin (Upload Model LSTM Saja)")
+    
+    # Cek df_musim dari session_state
+    if 'df_musim' not in st.session_state:
+        st.warning("❗ Data musim belum tersedia. Harap jalankan preprocessing di menu sebelumnya.")
+        st.stop()
+    
+    df = st.session_state['df_musim'].copy()
+    
+    if 'FF_X' not in df.columns:
+        st.error("❌ Kolom 'FF_X' tidak ditemukan.")
+        st.stop()
+    
+    # Upload model LSTM (.h5)
+    model_file = st.file_uploader("📤 Upload File Model LSTM (.h5)", type=["h5"])
+    if model_file is None:
+        st.info("⬆️ Silakan upload file model LSTM untuk melanjutkan.")
+        st.stop()
+    
+    # Simpan model ke file temporer
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as tmp_file:
+        tmp_file.write(model_file.read())
+        tmp_model_path = tmp_file.name
+    
+    # Load model
+    try:
+        model = load_model(tmp_model_path)
+    except Exception as e:
+        st.error(f"❌ Gagal memuat model: {e}")
+        os.unlink(tmp_model_path)
+        st.stop()
+    
+    # ================== Preprocessing ==================
+    all_data = df[['FF_X']].astype('float32')
+    scaler = MinMaxScaler()
+    scaled_data = scaler.fit_transform(all_data)
+    
+    n_days = 6
+    n_forecast_days = 30
+    n_features = 1
+    
+    supervised = series_to_supervised(scaled_data, n_days, 1)
+    X_all = supervised.values[:, :n_days * n_features]
+    
+    # Split train/test
+    split_idx = int(len(X_all) * 0.8)
+    df_train = all_data.iloc[n_days:split_idx + n_days]
+    df_test = all_data.iloc[split_idx + n_days:]
+    
+    # ================== Prediksi ==================
+    forecast = []
+    input_seq = scaled_data[-n_days:].reshape(1, n_days, n_features)
+    
+    for _ in range(n_forecast_days):
+        pred = model.predict(input_seq)
+        forecast.append(pred[0])
+        input_seq = np.append(input_seq[:, 1:, :], [[pred[0]]], axis=1)
+    
+    forecast_array = np.array(forecast)
+    forecast_inverse = scaler.inverse_transform(forecast_array)
+    forecast_inverse = np.abs(forecast_inverse)
+    
+    # Forecast dataframe
+    last_date = df.index[-1]
+    future_dates = pd.date_range(start=last_date + timedelta(days=1), periods=n_forecast_days)
+    forecast_df = pd.DataFrame(forecast_inverse, index=future_dates, columns=['FF_X'])
+    
+    # Simpan state
+    st.session_state['df_train'] = df_train
+    st.session_state['df_test'] = df_test
+    st.session_state['forecast_df'] = forecast_df
+    
+    # ================== Output ==================
+    st.subheader("📊 Hasil Prediksi 30 Hari")
+    st.dataframe(forecast_df)
+    
+    csv = forecast_df.to_csv().encode('utf-8')
+    st.download_button("⬇️ Download Hasil Prediksi (.csv)", csv, "prediksi_30_hari.csv", "text/csv")
+    
+    # ================== Visualisasi ==================
+    st.subheader("📈 Visualisasi Train - Test - Prediksi")
+    
+    features = ['FF_X']
+    for feature in features:
+        fig = make_subplots(rows=1, cols=1, shared_xaxes=True)
+    
+        fig.add_trace(go.Scatter(x=df_train.index, y=df_train[feature],
+                                 mode='lines', name='Data Training',
+                                 line=dict(color='green')), row=1, col=1)
+    
+        fig.add_trace(go.Scatter(x=df_test.index, y=df_test[feature],
+                                 mode='lines', name='Data Test',
+                                 line=dict(color='orange')), row=1, col=1)
+    
+        fig.add_trace(go.Scatter(x=forecast_df.index, y=forecast_df[feature],
+                                 mode='lines', name='Data Peramalan',
+                                 line=dict(color='blue')), row=1, col=1)
+    
+        # Garis sambung
+        if not df_train.empty and not df_test.empty:
+            fig.add_trace(go.Scatter(x=[df_train.index[-1], df_test.index[0]],
+                                     y=[df_train[feature].iloc[-1], df_test[feature].iloc[0]],
+                                     mode='lines', line=dict(color='orange'),
+                                     showlegend=False), row=1, col=1)
+    
+        if not df_test.empty and not forecast_df.empty:
+            fig.add_trace(go.Scatter(x=[df_test.index[-1], forecast_df.index[0]],
+                                     y=[df_test[feature].iloc[-1], forecast_df[feature].iloc[0]],
+                                     mode='lines', line=dict(color='blue'),
+                                     showlegend=False), row=1, col=1)
+    
+        fig.update_layout(
+            title=f"Peramalan {feature} untuk {n_forecast_days} Hari",
+            yaxis_title=feature,
+            autosize=False,
+            width=1200,
+            height=400,
+            legend=dict(x=0, y=1, orientation='h', traceorder='normal')
+        )
+    
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Hapus file model sementara
+    os.unlink(tmp_model_path)
