@@ -471,10 +471,14 @@ if menu == "Hyperparameter Tuning (LSTM)":
                     - features: List nama fitur yang ingin diprediksi
                     """
                     st.subheader("📊 Visualisasi Hasil Prediksi")
-                
+    
                     for feature in features:
-                        st.markdown(f"### Fitur: `{feature}`")
+                        if feature not in df_train.columns or f"{feature}_pred" not in predictions_df.columns:
+                            st.warning(f"❗ Fitur `{feature}` atau hasil prediksinya tidak ditemukan.")
+                            continue
                 
+                        st.markdown(f"### Fitur: `{feature}`")
+
                         # Buat trace Plotly
                         trace_train = go.Scatter(
                             x=df_train.index, y=df_train[feature],
@@ -504,10 +508,21 @@ if menu == "Hyperparameter Tuning (LSTM)":
                 
                         # Tampilkan di Streamlit
                         st.plotly_chart(fig, use_container_width=True)
+                required_keys = ['df_train', 'df_test', 'predictions_df', 'features']
+                if all(k in st.session_state for k in required_keys):
+                    df_train = st.session_state['df_train']
+                    df_test = st.session_state['df_test']
+                    predictions_df = st.session_state['predictions_df']
+                    features = st.session_state['features']
+                
+                    # Samakan index prediksi dengan test jika belum
+                    predictions_df.index = df_test.index[:predictions_df.shape[0]]
+                
+                    # Panggil fungsi visualisasi
+                    plot_feature_predictions_streamlit(df_train, df_test, predictions_df, features)
+                else:
+                    st.warning("❗ Beberapa data belum tersedia di session_state. Pastikan proses prediksi sudah dijalankan.")
             
-                # Panggil fungsi visualisasi
-                predictions_df.index = df_test.index[:predictions_df.shape[0]]
-                plot_feature_predictions(df_train, df_test, df_prediksi, features)
 if menu == "Evaluasi Model":
     st.title("📊 Evaluasi & Peramalan Model LSTM")
 
