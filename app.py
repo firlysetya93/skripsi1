@@ -508,7 +508,7 @@ if menu == "Evaluasi Model":
     # ====== PERAMALAN ======
     if 'loaded_model' in st.session_state:
         st.subheader("📈 Peramalan Kecepatan Angin (FF_X)")
-
+        # Ambil semua dari session_state
         X_train = st.session_state['X_train']
         y_train = st.session_state['y_train']
         X_test = st.session_state['X_test']
@@ -518,11 +518,8 @@ if menu == "Evaluasi Model":
         df_train = st.session_state['df_train']
         df_test = st.session_state['df_test']
         model = st.session_state['loaded_model']
-        df_musim_ = df_musim.copy()
-        df_musim = st.session_state['df_musim']
-        features = ['FF_X']
-        n_forecast_days = st.number_input("🔮 Jumlah Hari Peramalan", min_value=1, max_value=60, value=30)
-
+        df_musim = st.session_state['df_musim']  # Ambil dulu
+        df_musim_ = df_musim.copy()  
         # Scaling
         test_data = df_musim_[['FF_X']].astype('float32')
         scaler = MinMaxScaler(feature_range=(0, 1))
