@@ -554,6 +554,12 @@ if menu == "Evaluasi Model":
 
         # Plotting
         st.subheader("📉 Grafik Peramalan")
+        if 'df_musim' not in st.session_state:
+            st.warning("❗ Data musim belum tersedia. Silakan lakukan preprocessing terlebih dahulu.")
+            st.stop()
+        else:
+            df_musim = st.session_state['df_musim']
+            df_musim_ = df_musim.copy()
 
         for feature in features:
             fig = make_subplots(rows=1, cols=1, shared_xaxes=True)
