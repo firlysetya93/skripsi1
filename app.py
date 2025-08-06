@@ -603,5 +603,4 @@ if menu == "Evaluasi Model":
     
         st.plotly_chart(fig, use_container_width=True)
     
-    # Hapus file model sementara
-    os.unlink(tmp_model_path)
+
