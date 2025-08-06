@@ -308,6 +308,7 @@ if menu == "Hyperparameter Tuning (LSTM)":
         scaler = st.session_state.scaler
         df_train = st.session_state['df_train']
         df_test = st.session_state['df_test']
+        predictions_df = st.session_state['predictions_df']  
   
         n_trials = st.number_input("🔁 Jumlah Percobaan (Trials)", min_value=10, max_value=100, value=50, step=10)
     
